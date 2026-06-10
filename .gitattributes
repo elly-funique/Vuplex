@@ -1,0 +1,5 @@
+**/*.aar filter=lfs diff=lfs merge=lfs -text
+**/*.dll filter=lfs diff=lfs merge=lfs -text
+WebView/Standalone/Mac/Plugins/VuplexWebViewMac.bundle/Contents/Frameworks/Vuplex[[:space:]]WebView.app/Contents/Frameworks/Chromium[[:space:]]Embedded[[:space:]]Framework.framework/Chromium[[:space:]]Embedded[[:space:]]Framework filter=lfs diff=lfs merge=lfs -text
+WebView/Standalone/Mac/Plugins/VuplexWebViewMac_with_codecs.bundle/Contents/Frameworks/Vuplex[[:space:]]WebView.app/Contents/Frameworks/Chromium[[:space:]]Embedded[[:space:]]Framework.framework/Chromium[[:space:]]Embedded[[:space:]]Framework filter=lfs diff=lfs merge=lfs -text
+**/*.arr filter=lfs diff=lfs merge=lfs -text

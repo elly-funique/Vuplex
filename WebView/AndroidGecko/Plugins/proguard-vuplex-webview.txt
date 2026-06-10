@@ -1,0 +1,10 @@
+# If you use Proguard for your Android build, add these rules to your Proguard
+# file (proguard-user.txt) to prevent the needed Java classes from being obfuscated.
+
+-keep public class com.vuplex.webview.gecko.GeckoWebView { public *; }
+-keep public interface com.vuplex.webview.gecko.BooleanCallback { public *; }
+-keep public interface com.vuplex.webview.gecko.ByteArrayCallback { public *; }
+-keep public interface com.vuplex.webview.gecko.FileSelectionCallback { public *; }
+-keep public interface com.vuplex.webview.gecko.StringAndBooleanDelegateCallback { public *; }
+-keep public interface com.vuplex.webview.gecko.StringAndObjectCallback { public *; }
+-keep public interface com.vuplex.webview.gecko.VuplexCallback { public *; }
