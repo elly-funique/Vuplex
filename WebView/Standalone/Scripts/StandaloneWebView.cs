@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -23,8 +23,8 @@ using Vuplex.WebView.Internal;
 namespace Vuplex.WebView {
 
     /// <summary>
-    /// StandaloneWebView is the IWebView implementation used by 3D WebView for Windows and macOS.
-    /// It also includes additional APIs for Standalone-specific functionality.
+    /// The base IWebView implementation used by 3D WebView for Windows and macOS.
+    /// This class also includes extra methods for Standalone-specific functionality.
     /// </summary>
     public abstract partial class StandaloneWebView : BaseWebView,
                                                       IWithCursorType,
@@ -33,8 +33,6 @@ namespace Vuplex.WebView {
                                                       IWithKeyDownAndUp,
                                                       IWithMovablePointer,
                                                       IWithMutableAudio,
-                                                      IWithNativeJavaScriptDialogs,
-                                                      IWithPdfCreation,
                                                       IWithPixelDensity,
                                                       IWithPointerDownAndUp,
                                                       IWithPopups,
@@ -59,7 +57,7 @@ namespace Vuplex.WebView {
         /// <example>
         /// <code>
         /// await webViewPrefab.WaitUntilInitialized();
-        /// #if UNITY_STANDALONE || UNITY_EDITOR
+        /// #if UNITY_STANDALONE
         ///     var standaloneWebView = webViewPrefab.WebView as StandaloneWebView;
         ///     standaloneWebView.AuthRequested += (sender, eventArgs) => {
         ///         Debug.Log("Auth requested by " + eventArgs.Host);
@@ -157,20 +155,6 @@ namespace Vuplex.WebView {
             OnCopy();
         }
 
-        /// <see cref="IWithPdfCreation"/>
-        public Task<string> CreatePdf() {
-
-            _assertValidState();
-            var taskSource = new TaskCompletionSource<string>();
-            var resultCallbackId = Guid.NewGuid().ToString();
-            _pendingCreatePdfTaskSources[resultCallbackId] = taskSource;
-            var pdfSubdirectory = Path.Combine(Application.temporaryCachePath, WEBVIEW_DATA_SUBDIRECTORY_NAME, "pdfs");
-            Directory.CreateDirectory(pdfSubdirectory);
-            var pdfPath = Path.Combine(pdfSubdirectory, resultCallbackId + ".pdf");
-            WebView_createPdf(_nativeWebViewPtr, resultCallbackId, pdfPath);
-            return taskSource.Task;
-        }
-
         public override void Cut() {
 
             _assertValidState();
@@ -183,7 +167,7 @@ namespace Vuplex.WebView {
         /// </summary>
         /// <example>
         /// <code>
-        /// #if UNITY_STANDALONE || UNITY_EDITOR
+        /// #if UNITY_STANDALONE
         ///     var succeeded = await StandaloneWebView.DeleteAllCookies();
         /// #endif
         /// </code>
@@ -198,6 +182,24 @@ namespace Vuplex.WebView {
                 throw new ArgumentException("The url cannot be null.");
             }
             return _deleteCookies(url, cookieName);
+        }
+
+        /// <see cref="IWithTouch"/>
+        public void SendTouchEvent(TouchEvent touchEvent) {
+
+            _assertValidState();
+            var pixelsPoint = _convertNormalizedToPixels(touchEvent.Point);
+            WebView_sendTouchEvent(
+                _nativeWebViewPtr,
+                touchEvent.TouchID,
+                (int)touchEvent.Type,
+                pixelsPoint.x,
+                pixelsPoint.y,
+                touchEvent.RadiusX,
+                touchEvent.RadiusY,
+                touchEvent.RotationAngle,
+                touchEvent.Pressure
+            );
         }
 
         /// <summary>
@@ -222,8 +224,6 @@ namespace Vuplex.WebView {
             if (!success) {
                 _throwAlreadyInitializedException("EnableRemoteDebugging");
             }
-            var platform = Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor ? "Windows" : "macOS";
-            WebViewLogger.Log($"Enabling remote debugging for {platform} on port {portNumber}. Please visit http://localhost:{portNumber} using a Chromium-based browser. For more info, see <em>https://support.vuplex.com/articles/how-to-debug-web-content#standalone</em>. If port {portNumber} is already in use, you can specify a different port using StandaloneWebView.EnableRemoteDebugging(portNumber): <em>https://developer.vuplex.com/webview/StandaloneWebView#EnableRemoteDebugging</em>.");
         }
 
         public override void ExecuteJavaScript(string javaScript, Action<string> callback) {
@@ -327,11 +327,11 @@ namespace Vuplex.WebView {
         }
 
         /// <see cref="IWithMovablePointer"/>
-        public void MovePointer(Vector2 normalizedPoint, bool pointerLeave = false) {
+        public void MovePointer(Vector2 normalizedPoint) {
 
             _assertValidState();
             var pixelsPoint = _convertNormalizedToPixels(normalizedPoint);
-            WebView_movePointer(_nativeWebViewPtr, pixelsPoint.x, pixelsPoint.y, pointerLeave);
+            WebView_movePointer(_nativeWebViewPtr, pixelsPoint.x, pixelsPoint.y);
         }
 
         public override void Paste() {
@@ -371,24 +371,6 @@ namespace Vuplex.WebView {
             WebView_selectAll(_nativeWebViewPtr);
         }
 
-        /// <see cref="IWithTouch"/>
-        public void SendTouchEvent(TouchEvent touchEvent) {
-
-            _assertValidState();
-            var pixelsPoint = _convertNormalizedToPixels(touchEvent.Point);
-            WebView_sendTouchEvent(
-                _nativeWebViewPtr,
-                touchEvent.TouchID,
-                (int)touchEvent.Type,
-                pixelsPoint.x,
-                pixelsPoint.y,
-                touchEvent.RadiusX,
-                touchEvent.RadiusY,
-                touchEvent.RotationAngle,
-                touchEvent.Pressure
-            );
-        }
-
         /// <see cref="IWithMutableAudio"/>
         public void SetAudioMuted(bool muted) {
 
@@ -416,7 +398,7 @@ namespace Vuplex.WebView {
         /// <example>
         /// <code>
         /// void Awake() {
-        ///     #if UNITY_STANDALONE || UNITY_EDITOR
+        ///     #if UNITY_STANDALONE
         ///         var customCachePath = Path.Combine(Application.persistentDataPath, "your-chromium-cache");
         ///         StandaloneWebView.SetCachePath(customCachePath);
         ///     #endif
@@ -439,8 +421,8 @@ namespace Vuplex.WebView {
 
         /// <summary>
         /// Sets the log level for the Chromium logs. The default is ChromiumLogLevel.Warning. Log locations: <br/>
-        /// - Windows editor: {ProjectPath}\Assets\Vuplex\WebView\Standalone\Windows\Plugins\VuplexWebViewChromium\log-chromium.txt~ <br/>
-        /// - Windows player: {AppPath}\{AppName}_Data\Plugins\{Architecture}\VuplexWebViewChromium\log-chromium.txt <br/>
+        /// - Windows editor: {project path}\Assets\Vuplex\WebView\Standalone\Windows\Plugins\VuplexWebViewChromium\log-chromium.txt~ <br/>
+        /// - Windows player: {app path}\{app name}_Data\Plugins\{architecture}\VuplexWebViewChromium\log-chromium.txt <br/>
         /// - macOS: ~/Library/Logs/Vuplex/log-chromium.txt
         /// </summary>
         /// <remarks>
@@ -449,7 +431,7 @@ namespace Vuplex.WebView {
         /// <example>
         /// <code>
         /// void Awake() {
-        ///     #if UNITY_STANDALONE || UNITY_EDITOR
+        ///     #if UNITY_STANDALONE
         ///         StandaloneWebView.SetChromiumLogLevel(ChromiumLogLevel.Disabled);
         ///     #endif
         /// }
@@ -473,7 +455,7 @@ namespace Vuplex.WebView {
         /// <example>
         /// <code>
         /// void Awake() {
-        ///     #if UNITY_STANDALONE || UNITY_EDITOR
+        ///     #if UNITY_STANDALONE
         ///         StandaloneWebView.SetCommandLineArguments("--ignore-certificate-errors --disable-web-security");
         ///     #endif
         /// }
@@ -506,7 +488,7 @@ namespace Vuplex.WebView {
         public void SetDownloadsEnabled(bool enabled) {
 
             _assertValidState();
-            var downloadsDirectoryPath = enabled ? Path.Combine(Application.temporaryCachePath, Path.Combine(WEBVIEW_DATA_SUBDIRECTORY_NAME, "downloads")) : "";
+            var downloadsDirectoryPath = enabled ? Path.Combine(Application.temporaryCachePath, Path.Combine("Vuplex.WebView", "downloads")) : "";
             WebView_setDownloadsEnabled(_nativeWebViewPtr, downloadsDirectoryPath);
         }
 
@@ -525,7 +507,7 @@ namespace Vuplex.WebView {
         /// <example>
         /// <code>
         /// await webViewPrefab.WaitUntilInitialized();
-        /// #if UNITY_STANDALONE || UNITY_EDITOR
+        /// #if UNITY_STANDALONE
         ///     var standaloneWebView = webViewPrefab.WebView as StandaloneWebView;
         ///     standaloneWebView.SetNativeFileDialogEnabled(false);
         /// #endif
@@ -537,12 +519,23 @@ namespace Vuplex.WebView {
             WebView_setNativeFileDialogEnabled(_nativeWebViewPtr, enabled);
         }
 
-
-        /// <see cref="IWithNativeJavaScriptDialogs"/>
-        public void SetNativeJavaScriptDialogsEnabled(bool enabled) {
+        /// <summary>
+        /// Native popups triggered by JavaScript APIs like window.alert() are enabled by default,
+        /// but they can be disabled with this method.
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// await webViewPrefab.WaitUntilInitialized();
+        /// #if UNITY_STANDALONE
+        ///     var standaloneWebView = webViewPrefab.WebView as StandaloneWebView;
+        ///     standaloneWebView.SetNativeScriptDialogEnabled(false);
+        /// #endif
+        /// </code>
+        /// </example>
+        public void SetNativeScriptDialogEnabled(bool enabled) {
 
             _assertValidState();
-            WebView_setNativeJavaScriptDialogsEnabled(_nativeWebViewPtr, enabled);
+            WebView_setNativeScriptDialogEnabled(_nativeWebViewPtr, enabled);
         }
 
         /// <see cref="IWithPixelDensity"/>
@@ -583,7 +576,7 @@ namespace Vuplex.WebView {
         /// <example>
         /// <code>
         /// void Awake() {
-        ///     #if UNITY_STANDALONE || UNITY_EDITOR
+        ///     #if UNITY_STANDALONE
         ///         StandaloneWebView.SetScreenSharingEnabled(true);
         ///     #endif
         /// }
@@ -613,7 +606,7 @@ namespace Vuplex.WebView {
         /// <example>
         /// <code>
         /// void Awake() {
-        ///     #if UNITY_STANDALONE || UNITY_EDITOR
+        ///     #if UNITY_STANDALONE
         ///         // Disable the frame rate limit.
         ///         StandaloneWebView.SetTargetFrameRate(0);
         ///     #endif
@@ -637,7 +630,7 @@ namespace Vuplex.WebView {
         /// await webViewPrefab.WaitUntilInitialized();
         /// webViewPrefab.WebView.LoadProgressChanged += (sender, eventArgs) => {
         ///     if (eventArgs.Type == ProgressChangeType.Finished) {
-        ///         #if UNITY_STANDALONE || UNITY_EDITOR
+        ///         #if UNITY_STANDALONE
         ///             var standaloneWebView = webViewPrefab.WebView as StandaloneWebView;
         ///             standaloneWebView.SetZoomLevel(1.75f);
         ///         #endif
@@ -701,27 +694,13 @@ namespace Vuplex.WebView {
             return _terminationTaskSource.Task;
         }
 
-        public override void ZoomIn() {
-
-            OnZoomIn();
-            base.ZoomIn();
-        }
-
-        public override void ZoomOut() {
-
-            OnZoomOut();
-            base.ZoomOut();
-        }
-
     #region Non-public members
         EventHandler<AuthRequestedEventArgs> _authRequestedHandler;
         static string _cachePathOverride;
         event EventHandler<EventArgs<string>> _cursorTypeChanged;
         EventHandler<FileSelectionEventArgs> _fileSelectionHandler;
-        Dictionary<string, TaskCompletionSource<string>> _pendingCreatePdfTaskSources = new Dictionary<string, TaskCompletionSource<string>>();
         static Dictionary<string, Action<Cookie[]>> _pendingGetCookiesResultCallbacks = new Dictionary<string, Action<Cookie[]>>();
         static Dictionary<string, Action<bool>> _pendingModifyCookiesResultCallbacks = new Dictionary<string, Action<bool>>();
-        const string WEBVIEW_DATA_SUBDIRECTORY_NAME = "Vuplex.WebView";
         static TaskCompletionSource<bool> _terminationTaskSource;
 
         static Task<bool> _deleteCookies(string url = null, string cookieName = null) {
@@ -735,7 +714,7 @@ namespace Vuplex.WebView {
 
         protected static string _getCachePath() {
 
-            return _cachePathOverride ?? Path.Combine(Application.persistentDataPath, WEBVIEW_DATA_SUBDIRECTORY_NAME, "chromium-cache");
+            return _cachePathOverride ?? Path.Combine(Application.persistentDataPath, "Vuplex.WebView", "chromium-cache");
         }
 
         // Invoked by the native plugin.
@@ -792,21 +771,6 @@ namespace Vuplex.WebView {
         }
 
         // Invoked by the native plugin.
-        void HandlePdfCreated(string message) {
-
-            var components = message.Split(new char[] { ',' }, 2);
-            var resultCallbackId = components[0];
-            var filePath = components[1];
-            var taskSource = _pendingCreatePdfTaskSources[resultCallbackId];
-            _pendingCreatePdfTaskSources.Remove(resultCallbackId);
-            if (filePath.Length == 0) {
-                taskSource.SetException(new Exception("Failed to create PDF. Please check the Chromium logs for more details: https://developer.vuplex.com/webview/StandaloneWebView#SetChromiumLogLevel"));
-            } else {
-                taskSource.SetResult(filePath);
-            }
-        }
-
-        // Invoked by the native plugin.
         void HandlePopup(string message) {
 
             if (PopupRequested == null) {
@@ -821,7 +785,7 @@ namespace Vuplex.WebView {
                 return;
             }
             var popupWebView = _instantiate();
-            ThreadDispatcher.RunOnMainThread(async () => {
+            Dispatcher.RunOnMainThread(async () => {
                 await popupWebView._initPopup(Size.x, Size.y, PixelDensity, popupBrowserId);
                 PopupRequested?.Invoke(this, new PopupRequestedEventArgs(url, popupWebView as IWebView));
             });
@@ -900,8 +864,6 @@ namespace Vuplex.WebView {
         partial void OnLoadHtml();
         partial void OnLoadUrl(string url);
         partial void OnPaste();
-        partial void OnZoomIn();
-        partial void OnZoomOut();
 
         void _pointerDown(Vector2 normalizedPoint, MouseButton mouseButton, int clickCount) {
 
@@ -929,19 +891,13 @@ namespace Vuplex.WebView {
         [AOT.MonoPInvokeCallback(typeof(Action<string, string, string>))]
         static void _unitySendMessage(string gameObjectName, string methodName, string message) {
 
-            ThreadDispatcher.RunOnMainThread(() => {
-                try {
-                    var gameObj = GameObject.Find(gameObjectName);
-                    if (gameObj == null) {
-                        WebViewLogger.LogWarning($"Unable to deliver a message from the native plugin to a webview GameObject because there is no longer a GameObject named '{gameObjectName}'. This can sometimes happen directly after destroying a webview. In that case, it is benign and this message can be ignored.");
-                        return;
-                    }
-                    gameObj.SendMessage(methodName, message);
-                } catch (Exception exception) {
-                    // Catch exceptions triggered by invoking the method with SendMessage()
-                    // because some applications terminate the application on uncaught exceptions.
-                    Debug.LogException(exception);
+            Dispatcher.RunOnMainThread(() => {
+                var gameObj = GameObject.Find(gameObjectName);
+                if (gameObj == null) {
+                    WebViewLogger.LogWarning($"Unable to deliver a message from the native plugin to a webview GameObject because there is no longer a GameObject named '{gameObjectName}'. This can sometimes happen directly after destroying a webview. In that case, it is benign and this message can be ignored.");
+                    return;
                 }
+                gameObj.SendMessage(methodName, message);
             });
         }
 
@@ -962,9 +918,6 @@ namespace Vuplex.WebView {
 
         [DllImport(_dllName)]
         static extern void WebView_copy(IntPtr webViewPtr);
-
-        [DllImport(_dllName)]
-        static extern void WebView_createPdf(IntPtr webViewPtr, string resultCallbackId, string filePath);
 
         [DllImport(_dllName)]
         static extern void WebView_cut(IntPtr webViewPtr);
@@ -1002,7 +955,7 @@ namespace Vuplex.WebView {
         static extern void WebView_keyUp(IntPtr webViewPtr, string key, int modifiers);
 
         [DllImport (_dllName)]
-        static extern void WebView_movePointer(IntPtr webViewPtr, int x, int y, bool pointerLeave);
+        static extern void WebView_movePointer(IntPtr webViewPtr, int x, int y);
 
         [DllImport(_dllName)]
         static extern IntPtr WebView_new(string gameObjectName, int width, int height, float pixelDensity, string popupBrowserId);
@@ -1075,7 +1028,7 @@ namespace Vuplex.WebView {
         static extern void WebView_setNativeFileDialogEnabled(IntPtr webViewPtr, bool enabled);
 
         [DllImport(_dllName)]
-        static extern void WebView_setNativeJavaScriptDialogsEnabled(IntPtr webViewPtr, bool enabled);
+        static extern void WebView_setNativeScriptDialogEnabled(IntPtr webViewPtr, bool enabled);
 
         [DllImport(_dllName)]
         static extern void WebView_setPopupMode(IntPtr webViewPtr, int popupMode);
@@ -1130,18 +1083,10 @@ namespace Vuplex.WebView {
             callback(result);
         }
 
-        [Obsolete("StandaloneWebView.SetNativeScriptDialogEnabled() is now deprecated. Please switch to IWithNativeJavaScriptDialogs.SetNativeJavaScriptDialogsEnabled(): https://developer.vuplex.com/webview/IWithNativeJavaScriptDialogs")]
-        public void SetNativeScriptDialogEnabled(bool enabled) => SetNativeJavaScriptDialogsEnabled(enabled);
-
         // Deprecated in v4.2.
         [Obsolete("StandaloneWebView.TerminatePlugin() has been replaced with StandaloneWebView.TerminateBrowserProcess(). Please switch to TerminateBrowserProcess().")]
         public static void TerminatePlugin() => TerminateBrowserProcess();
     #endregion
     }
-}
-#else
-namespace Vuplex.WebView {
-    [System.Obsolete("The StandaloneWebView class is only available on Windows and macOS. So, when building for other platforms (e.g. Android, iOS, WebGL), it's necessary to use the directive `#if UNITY_STANDALONE || UNITY_EDITOR` like described here: https://support.vuplex.com/articles/how-to-call-platform-specific-apis#standalone . Note: StandaloneWebView isn't actually obsolete. This compiler error just reports it's obsolete because 3D WebView generated the error with System.ObsoleteAttribute.", true)]
-    public class StandaloneWebView {}
 }
 #endif

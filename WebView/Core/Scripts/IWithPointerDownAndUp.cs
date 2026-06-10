@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -21,15 +21,8 @@ namespace Vuplex.WebView {
     /// drag interactions, double-clicks, and right-clicks.
     /// </summary>
     /// <remarks>
-    /// For details on the limitations of drag interactions on iOS and UWP, please see
+    /// For information on the limitations of drag interactions on iOS and UWP, please see
     /// https://support.vuplex.com/articles/hover-and-drag-limitations.
-    /// </remarks>
-    /// <remarks>
-    /// The Android Gecko package has the following limitations:
-    /// <list type="bullet">
-    ///   <item>Double-clicks aren't supported.</item>
-    ///   <item>Right-clicks don't trigger the JavaScript contextmenu event. However, they can still be detected through other events, like the JavaScript click event.</item>
-    /// </list>
     /// </remarks>
     /// <example>
     /// <code>

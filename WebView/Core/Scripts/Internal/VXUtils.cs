@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -34,12 +34,12 @@ namespace Vuplex.WebView.Internal {
         public static Material CreateDefaultMaterial() {
 
             // Construct a new material, because Resources.Load<T>() returns a singleton.
-            return new Material(Resources.Load<Material>("DefaultWebMaterial"));
+            return new Material(Resources.Load<Material>("DefaultViewportMaterial"));
         }
 
         public static Texture2D CreateDefaultTexture(int width, int height) {
 
-            VXUtils.WarnIfAbnormallyLarge(width, height);
+            VXUtils.ThrowExceptionIfAbnormallyLarge(width, height);
             var texture = new Texture2D(
                 width,
                 height,
@@ -82,16 +82,16 @@ namespace Vuplex.WebView.Internal {
             WebViewLogger.LogWarning(methodName + "() was called but will be ignored because it is not supported in Native 2D Mode.");
         }
 
-        public static void WarnIfAbnormallyLarge(int width, int height) {
+        public static void ThrowExceptionIfAbnormallyLarge(int width, int height) {
 
             // Anything over 19.4 megapixels (6k) is almost certainly a mistake.
             // Cast to floats to avoid integer overflow.
             if ((float)width * (float)height > 19400000) {
                 var message = $"The application specified an abnormally large webview size ({width}px x {height}px), and webviews of this size are normally only created by mistake. A WebViewPrefab's default resolution is 1300px per Unity unit, so it's likely that you specified a large physical size by mistake or need to adjust the resolution. For more information, please see WebViewPrefab.Resolution: https://developer.vuplex.com/webview/WebViewPrefab#Resolution .";
-                WebViewLogger.LogWarning(message);
-                // In the Editor, throw an exception to prevent a graphics error from crashing the Editor.
-                #if UNITY_EDITOR && !VUPLEX_ALLOW_LARGE_WEBVIEWS
-                    throw new ArgumentException(message + " This exception is thrown while running in the Editor in order to prevent the Editor from crashing due to a graphics error. If this large webview size is intentional, you can disable this exception by adding the scripting symbol VUPLEX_ALLOW_LARGE_WEBVIEWS to player settings. However, please note that if the webview size is larger than the graphics system can handle, the Editor may crash.");
+                #if VUPLEX_ALLOW_LARGE_WEBVIEWS
+                    WebViewLogger.LogWarning(message);
+                #else
+                    throw new ArgumentException(message + " If this large webview size is intentional, you can disable this exception by adding the scripting symbol VUPLEX_ALLOW_LARGE_WEBVIEWS to player settings. However, please note that if the webview size is larger than the graphics system can handle, the app may crash.");
                 #endif
             }
         }

@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -13,14 +13,14 @@
 // limitations under the License.
 using System;
 using System.Threading.Tasks;
+using System.Timers;
 using UnityEngine;
-using Vuplex.WebView;
 
-namespace Vuplex.Demos {
+namespace Vuplex.WebView.Demos {
 
     /// <summary>
     /// Sets up the AdvancedWebViewDemo scene, which displays web content in a main
-    /// world-space WebViewPrefab and renders a UI in a second webview to display the current URL
+    /// world-space WebViewPrefab and then renders a UI in a second webview to display the current URL
     /// and provide back / forward navigation controls.<br/><br/>
     ///
     /// <b>Note:</b> The address bar currently only displays the current URL and is not an input.
@@ -31,23 +31,23 @@ namespace Vuplex.Demos {
     /// <remarks>
     /// This scene demonstrates the following: <br/>
     /// - Programmatically instantiating WebViewPrefabs at runtime <br/>
-    /// - Programmatically instantiating an on-screen Keyboard prefab <br/>
-    /// - Using IWebView methods like LoadUrl(), LoadHtml(), GoBack(), and GoForward() <br/>
+    /// - Creating and hooking up an on-screen keyboard <br/>
+    /// - Using IWebView methods like LoadUrl, LoadHtml, GoBack, and GoForward <br/>
     /// - Attaching handlers to the IWebView.UrlChanged and MessageEmitted events <br/>
-    /// - Sending messages from JavaScript to C#  and vice versa <br/>
+    /// - Message passing from C#-to-JavaScript and vice versa <br/>
     /// - Creating a transparent webview using the transparent meta tag <br/><br/>
     ///
     /// Links: <br/>
     /// - WebViewPrefab docs: https://developer.vuplex.com/webview/WebViewPrefab <br/>
-    /// - Sending messages from JavaScript to C# and vice versa: https://support.vuplex.com/articles/how-to-send-messages-from-javascript-to-c-sharp <br/>
-    /// - How to make a transparent webview: https://support.vuplex.com/articles/how-to-make-a-webview-transparent <br/>
     /// - How clicking works: https://support.vuplex.com/articles/clicking <br/>
     /// - Other examples: https://developer.vuplex.com/webview/overview#examples <br/>
     /// </remarks>
     class AdvancedWebViewDemo : MonoBehaviour {
 
-        WebViewPrefab controlsWebViewPrefab;
-        WebViewPrefab mainWebViewPrefab;
+        Timer _buttonRefreshTimer = new Timer();
+        WebViewPrefab _controlsWebViewPrefab;
+        HardwareKeyboardListener _hardwareKeyboardListener;
+        WebViewPrefab _mainWebViewPrefab;
 
         async void Start() {
 
@@ -57,64 +57,60 @@ namespace Vuplex.Demos {
             // https://developer.vuplex.com/webview/Web#SetUserAgent
             Web.SetUserAgent(false);
 
-            // Instantiate a 0.6 x 0.3 webview for the main web content.
-            // https://developer.vuplex.com/webview/WebViewPrefab#Instantiate
-            mainWebViewPrefab = WebViewPrefab.Instantiate(0.6f, 0.3f);
-            mainWebViewPrefab.PixelDensity = 2;
-            mainWebViewPrefab.transform.parent = transform;
-            mainWebViewPrefab.transform.localPosition = new Vector3(0, -0.05f, 0.4f);
-            mainWebViewPrefab.transform.localEulerAngles = new Vector3(0, 180, 0);
+            // Create a 0.6 x 0.3 webview for the main web content.
+            _mainWebViewPrefab = WebViewPrefab.Instantiate(0.6f, 0.3f);
+            _mainWebViewPrefab.PixelDensity = 2;
+            _mainWebViewPrefab.transform.parent = transform;
+            _mainWebViewPrefab.transform.localPosition = new Vector3(0, -0.05f, 0.4f);
+            _mainWebViewPrefab.transform.localEulerAngles = new Vector3(0, 180, 0);
 
-            // Instantiate a second webview above the first to show a UI that
+            // Create a second webview above the first to show a UI that
             // displays the current URL and provides back / forward navigation buttons.
-            controlsWebViewPrefab = WebViewPrefab.Instantiate(0.6f, 0.05f);
-            controlsWebViewPrefab.KeyboardEnabled = false;
-            controlsWebViewPrefab.transform.parent = mainWebViewPrefab.transform;
-            controlsWebViewPrefab.transform.localPosition = new Vector3(0, 0.06f, 0);
-            controlsWebViewPrefab.transform.localEulerAngles = Vector3.zero;
+            _controlsWebViewPrefab = WebViewPrefab.Instantiate(0.6f, 0.05f);
+            _controlsWebViewPrefab.transform.parent = _mainWebViewPrefab.transform;
+            _controlsWebViewPrefab.transform.localPosition = new Vector3(0, 0.06f, 0);
+            _controlsWebViewPrefab.transform.localEulerAngles = Vector3.zero;
 
-            // Add an on-screen keyboard under the main webview.
-            // https://developer.vuplex.com/webview/Keyboard
-            var keyboard = Keyboard.Instantiate();
-            keyboard.transform.SetParent(mainWebViewPrefab.transform, false);
-            keyboard.transform.localPosition = new Vector3(0, -0.31f, 0);
-            keyboard.transform.localEulerAngles = Vector3.zero;
+            // Set up a timer to allow the state of the back / forward buttons to be
+            // refreshed one second after a URL change occurs.
+            _buttonRefreshTimer.AutoReset = false;
+            _buttonRefreshTimer.Interval = 1000;
+            _buttonRefreshTimer.Elapsed += ButtonRefreshTimer_Elapsed;
 
-            // Wait for the prefabs to initialize because the WebView property of each is null until then.
-            // https://developer.vuplex.com/webview/WebViewPrefab#WaitUntilInitialized
+            _setUpKeyboards();
+
+            // Wait for both WebViewPrefabs to initialize, because the
+            // WebViewPrefab.WebView property is null until the prefabs have initialized.
             await Task.WhenAll(new Task[] {
-               mainWebViewPrefab.WaitUntilInitialized(),
-               controlsWebViewPrefab.WaitUntilInitialized()
+               _mainWebViewPrefab.WaitUntilInitialized(),
+               _controlsWebViewPrefab.WaitUntilInitialized()
             });
 
-            // Now that the WebViewPrefabs are initialized, we can use the IWebView APIs via its WebView property.
-            // https://developer.vuplex.com/webview/IWebView
-            mainWebViewPrefab.WebView.UrlChanged += (sender, eventArgs) => {
-                _setDisplayedUrl(eventArgs.Url);
-                // Refresh the back / forward button state after 1 second.
-                Invoke("_refreshBackForwardState", 1);
-            };
-            mainWebViewPrefab.WebView.LoadUrl("https://www.google.com");
+            // Now that the WebViewPrefabs are initialized, we can use the WebViewPrefab.WebView property.
+            _mainWebViewPrefab.WebView.UrlChanged += MainWebView_UrlChanged;
+            _mainWebViewPrefab.WebView.LoadUrl("https://www.google.com");
 
-            controlsWebViewPrefab.WebView.MessageEmitted += Controls_MessageEmitted;
-            controlsWebViewPrefab.WebView.LoadHtml(CONTROLS_HTML);
+            _controlsWebViewPrefab.WebView.MessageEmitted += Controls_MessageEmitted;
+            _controlsWebViewPrefab.WebView.LoadHtml(CONTROLS_HTML);
 
             // Android Gecko and UWP w/ XR enabled don't support transparent webviews, so set the cutout
             // rect to the entire view so that the shader makes its black background pixels transparent.
-            var pluginType = controlsWebViewPrefab.WebView.PluginType;
+            var pluginType = _controlsWebViewPrefab.WebView.PluginType;
             if (pluginType == WebPluginType.AndroidGecko || pluginType == WebPluginType.UniversalWindowsPlatform) {
-                controlsWebViewPrefab.SetCutoutRect(new Rect(0, 0, 1, 1));
+                _controlsWebViewPrefab.SetCutoutRect(new Rect(0, 0, 1, 1));
             }
         }
 
-        async void _refreshBackForwardState() {
+        void ButtonRefreshTimer_Elapsed(object sender, ElapsedEventArgs eventArgs) {
 
             // Get the main webview's back / forward state and then post a message
             // to the controls UI to update its buttons' state.
-            var canGoBack = await mainWebViewPrefab.WebView.CanGoBack();
-            var canGoForward  = await mainWebViewPrefab.WebView.CanGoForward();
-            var serializedMessage = $"{{ \"type\": \"SET_BUTTONS\", \"canGoBack\": {canGoBack.ToString().ToLowerInvariant()}, \"canGoForward\": {canGoForward.ToString().ToLowerInvariant()} }}";
-            controlsWebViewPrefab.WebView.PostMessage(serializedMessage);
+            Vuplex.WebView.Internal.Dispatcher.RunOnMainThread(async () => {
+                var canGoBack = await _mainWebViewPrefab.WebView.CanGoBack();
+                var canGoForward  = await _mainWebViewPrefab.WebView.CanGoForward();
+                var serializedMessage = $"{{ \"type\": \"SET_BUTTONS\", \"canGoBack\": {canGoBack.ToString().ToLowerInvariant()}, \"canGoForward\": {canGoForward.ToString().ToLowerInvariant()} }}";
+                _controlsWebViewPrefab.WebView.PostMessage(serializedMessage);
+            });
         }
 
         void Controls_MessageEmitted(object sender, EventArgs<string> eventArgs) {
@@ -122,23 +118,60 @@ namespace Vuplex.Demos {
             if (eventArgs.Value == "CONTROLS_INITIALIZED") {
                 // The controls UI won't be initialized in time to receive the first UrlChanged event,
                 // so explicitly set the initial URL after the controls UI indicates it's ready.
-                _setDisplayedUrl(mainWebViewPrefab.WebView.Url);
+                _setDisplayedUrl(_mainWebViewPrefab.WebView.Url);
                 return;
             }
             var message = eventArgs.Value;
             if (message == "GO_BACK") {
-                mainWebViewPrefab.WebView.GoBack();
+                _mainWebViewPrefab.WebView.GoBack();
             } else if (message == "GO_FORWARD") {
-                mainWebViewPrefab.WebView.GoForward();
+                _mainWebViewPrefab.WebView.GoForward();
             }
+        }
+
+        void MainWebView_UrlChanged(object sender, UrlChangedEventArgs eventArgs) {
+
+            _setDisplayedUrl(eventArgs.Url);
+            _buttonRefreshTimer.Start();
         }
 
         void _setDisplayedUrl(string url) {
 
-            if (controlsWebViewPrefab.WebView != null) {
+            if (_controlsWebViewPrefab.WebView != null) {
                 var serializedMessage = $"{{ \"type\": \"SET_URL\", \"url\": \"{url}\" }}";
-                controlsWebViewPrefab.WebView.PostMessage(serializedMessage);
+                _controlsWebViewPrefab.WebView.PostMessage(serializedMessage);
             }
+        }
+
+        async void _setUpKeyboards() {
+
+            await _mainWebViewPrefab.WaitUntilInitialized();
+            // Send keys from the hardware (USB or Bluetooth) keyboard to the webview.
+            // Use separate KeyDown() and KeyUp() methods if the webview supports
+            // it, otherwise just use IWebView.SendKey().
+            // https://developer.vuplex.com/webview/IWithKeyDownAndUp
+
+            var webViewWithKeyDownAndUp = _mainWebViewPrefab.WebView as IWithKeyDownAndUp;
+            _hardwareKeyboardListener = HardwareKeyboardListener.Instantiate();
+            _hardwareKeyboardListener.KeyDownReceived += (sender, eventArgs) => {
+                if (webViewWithKeyDownAndUp != null) {
+                    webViewWithKeyDownAndUp.KeyDown(eventArgs.Value, eventArgs.Modifiers);
+                } else {
+                    _mainWebViewPrefab.WebView.SendKey(eventArgs.Value);
+                }
+            };
+            _hardwareKeyboardListener.KeyUpReceived += (sender, eventArgs) => {
+                webViewWithKeyDownAndUp?.KeyUp(eventArgs.Value, eventArgs.Modifiers);
+            };
+
+            // Also add an on-screen keyboard under the main webview.
+            var keyboard = Keyboard.Instantiate();
+            keyboard.transform.SetParent(_mainWebViewPrefab.transform, false);
+            keyboard.transform.localPosition = new Vector3(0, -0.31f, 0);
+            keyboard.transform.localEulerAngles = Vector3.zero;
+            keyboard.InputReceived += (sender, eventArgs) => {
+                _mainWebViewPrefab.WebView.SendKey(eventArgs.Value);
+            };
         }
 
         const string CONTROLS_HTML = @"

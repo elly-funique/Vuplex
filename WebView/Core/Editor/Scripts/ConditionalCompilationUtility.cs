@@ -1,12 +1,9 @@
 /*
 * This file is a copy of Unity's [ConditionalCompilationUtility](https://github.com/Unity-Technologies/ConditionalCompilationUtility/tree/f364090bbda3728e1662074c969c2b7c3c34199b)
 * with the following modifications:
-* - Changed the namespace.
-* - Removed the usage of k_EnableCCU and instead hardcoded the use of the Vuplex OptionalDependencyAttribute class.
-* - Pasted the license below.
-* - Updated ForEachAssembly() to catch TypeLoadException in addition to ReflectionTypeLoadException.
-* - Made it so that if an optional dependency is removed, the scripting symbol for it is removed.
-* - Made it so that the legacy VUPLEX_CCU scripting symbol previously used by this script is automatically removed from the project.
+* - changed the namespace
+* - changed k_EnableCCU from UNITY_CCU to VUPLEX_CCU
+* - pasted the license below
 *
 * Unity Companion License 1.0 ("License")
 * Copyright (C) 2017-2018 Unity Technologies ApS ("Unity")
@@ -50,7 +47,6 @@ using UnityEditor.Compilation;
 using Assembly = System.Reflection.Assembly;
 using Debug = UnityEngine.Debug;
 using System.Threading;
-using VuplexOptionalDependencyAttribute = Vuplex.WebView.Editor.OptionalDependencyAttribute;
 
 namespace Vuplex.WebView.ConditionalCompilation
 {
@@ -79,10 +75,18 @@ namespace Vuplex.WebView.ConditionalCompilation
     static class ConditionalCompilationUtility
     {
         const string k_PreviousUnsuccessfulDefines = "ConditionalCompilationUtility.PreviousUnsuccessfulDefines";
+        const string k_EnableCCU = "VUPLEX_CCU";
+
+        public static bool enabled
+        {
+            get
+            {
+                var buildTargetGroup = EditorUserBuildSettings.selectedBuildTargetGroup;
+                return PlayerSettings.GetScriptingDefineSymbolsForGroup(buildTargetGroup).Contains(k_EnableCCU);
+            }
+        }
 
         public static string[] defines { private set; get; }
-
-        static Type _dependencyAttributeType = typeof(VuplexOptionalDependencyAttribute);
 
         static ConditionalCompilationUtility()
         {
@@ -129,25 +133,75 @@ namespace Vuplex.WebView.ConditionalCompilation
 
             var previousProjectDefines = PlayerSettings.GetScriptingDefineSymbolsForGroup(buildTargetGroup);
             var projectDefines = previousProjectDefines.Split(';').ToList();
-            var ccuDefines = new List<string>();
+            if (!projectDefines.Contains(k_EnableCCU, StringComparer.OrdinalIgnoreCase))
+            {
+                EditorApplication.LockReloadAssemblies();
+
+                projectDefines.Add(k_EnableCCU);
+
+                // This will trigger another re-compile, which needs to happen, so all the custom attributes will be visible
+                PlayerSettings.SetScriptingDefineSymbolsForGroup(buildTargetGroup, string.Join(";", projectDefines.ToArray()));
+
+                // Let other systems execute before reloading assemblies
+                Thread.Sleep(1000);
+                EditorApplication.UnlockReloadAssemblies();
+
+                return;
+            }
+
+            var ccuDefines = new List<string> { k_EnableCCU };
 
             var conditionalAttributeType = typeof(ConditionalAttribute);
 
             const string kDependentClass = "dependentClass";
             const string kDefine = "define";
 
+            var attributeTypes = GetAssignableTypes(typeof(Attribute), type =>
+            {
+                var conditionals = (ConditionalAttribute[])type.GetCustomAttributes(conditionalAttributeType, true);
+
+                foreach (var conditional in conditionals)
+                {
+                    if (string.Equals(conditional.ConditionString, k_EnableCCU, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var dependentClassField = type.GetField(kDependentClass);
+                        if (dependentClassField == null)
+                        {
+                            Debug.LogErrorFormat("[CCU] Attribute type {0} missing field: {1}", type.Name, kDependentClass);
+                            return false;
+                        }
+
+                        var defineField = type.GetField(kDefine);
+                        if (defineField == null)
+                        {
+                            Debug.LogErrorFormat("[CCU] Attribute type {0} missing field: {1}", type.Name, kDefine);
+                            return false;
+                        }
+
+                        return true;
+                    }
+                }
+
+                return false;
+            });
+
             var dependencies = new Dictionary<string, string>();
             ForEachAssembly(assembly =>
             {
-                var typeAttributes = assembly.GetCustomAttributes(_dependencyAttributeType, false);
+                var typeAttributes = assembly.GetCustomAttributes(false).Cast<Attribute>();
                 foreach (var typeAttribute in typeAttributes)
                 {
-                    // These fields were already validated in a previous step
-                    var dependentClass = _dependencyAttributeType.GetField(kDependentClass).GetValue(typeAttribute) as string;
-                    var define = _dependencyAttributeType.GetField(kDefine).GetValue(typeAttribute) as string;
+                    if (attributeTypes.Contains(typeAttribute.GetType()))
+                    {
+                        var t = typeAttribute.GetType();
 
-                    if (!string.IsNullOrEmpty(dependentClass) && !string.IsNullOrEmpty(define) && !dependencies.ContainsKey(dependentClass))
-                        dependencies.Add(dependentClass, define);
+                        // These fields were already validated in a previous step
+                        var dependentClass = t.GetField(kDependentClass).GetValue(typeAttribute) as string;
+                        var define = t.GetField(kDefine).GetValue(typeAttribute) as string;
+
+                        if (!string.IsNullOrEmpty(dependentClass) && !string.IsNullOrEmpty(define) && !dependencies.ContainsKey(dependentClass))
+                            dependencies.Add(dependentClass, define);
+                    }
                 }
             });
 
@@ -170,17 +224,6 @@ namespace Vuplex.WebView.ConditionalCompilation
                 }
             });
 
-            // Remove scripting symbols for optional dependencies that have been removed.
-            foreach (var define in dependencies.Values)
-            {
-                if (projectDefines.Contains(define) && !ccuDefines.Contains(define))
-                    projectDefines.Remove(define);
-            }
-
-            // Remove the legacy VUPLEX_CCU scripting symbol that this script used to add.
-            if (projectDefines.Contains("VUPLEX_CCU"))
-                projectDefines.Remove("VUPLEX_CCU");
-
             if (reset)
             {
                 foreach (var define in dependencies.Values)
@@ -189,6 +232,7 @@ namespace Vuplex.WebView.ConditionalCompilation
                 }
 
                 ccuDefines.Clear();
+                ccuDefines.Add(k_EnableCCU);
             }
 
             ConditionalCompilationUtility.defines = ccuDefines.ToArray();
@@ -207,7 +251,7 @@ namespace Vuplex.WebView.ConditionalCompilation
                 {
                     callback(assembly);
                 }
-                catch (Exception ex) when (ex is ReflectionTypeLoadException || ex is TypeLoadException)
+                catch (ReflectionTypeLoadException)
                 {
                     // Skip any assemblies that don't load properly
                     continue;

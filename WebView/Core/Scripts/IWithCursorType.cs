@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -26,7 +26,6 @@ namespace Vuplex.WebView {
         /// is a string indicating the [CSS cursor type value](https://developer.mozilla.org/en-US/docs/Web/CSS/cursor)
         /// (e.g. `"default"`, `"pointer"`, `"wait"`, etc.).
         /// </summary>
-        /// <seealso cref="WebViewPrefab.CursorIconsEnabled"/>
         /// <example>
         /// <code>
         /// await webViewPrefab.WaitUntilInitialized();

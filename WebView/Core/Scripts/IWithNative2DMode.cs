@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -29,13 +29,6 @@ namespace Vuplex.WebView {
         /// Gets a value indicating whether the webview is running in Native 2D Mode.
         /// </summary>
         /// <seealso cref="CanvasWebViewPrefab.Native2DModeEnabled"/>
-        /// <example>
-        /// <code>
-        /// await canvasWebViewPrefab.WaitUntilInitialized();
-        /// var native2DWebView = canvasWebViewPrefab.WebView as IWithNative2DMode;
-        /// Debug.Log("Native 2D Mode enabled: " + native2DWebView?.Native2DModeEnabled);
-        /// </code>
-        /// </example>
         bool Native2DModeEnabled { get; }
 
         /// <summary>
@@ -61,13 +54,6 @@ namespace Vuplex.WebView {
         /// <remarks>
         /// This method is currently not supported on UWP.
         /// </remarks>
-        /// <example>
-        /// <code>
-        /// await canvasWebViewPrefab.WaitUntilInitialized();
-        /// var native2DWebView = canvasWebViewPrefab.WebView as IWithNative2DMode;
-        /// native2DWebView?.BringToFront();
-        /// </code>
-        /// </example>
         void BringToFront();
 
         /// <summary>
@@ -80,13 +66,6 @@ namespace Vuplex.WebView {
         /// Sets whether the native 2D webview's pinch-to-zoom behavior
         /// is enabled. The default is `true`.
         /// </summary>
-        /// <example>
-        /// <code>
-        /// await canvasWebViewPrefab.WaitUntilInitialized();
-        /// var native2DWebView = canvasWebViewPrefab.WebView as IWithNative2DMode;
-        /// native2DWebView?.SetNativeZoomEnabled(false);
-        /// </code>
-        /// </example>
         void SetNativeZoomEnabled(bool enabled);
 
         /// <summary>

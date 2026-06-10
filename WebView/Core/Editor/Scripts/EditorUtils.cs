@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -11,16 +11,48 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#pragma warning disable CS0618
 using System;
 using System.IO;
 using System.Linq;
 using UnityEngine;
 using UnityEditor;
+using UnityEditor.Build;
+using UnityEngine.Rendering;
 using Vuplex.WebView.Internal;
 
 namespace Vuplex.WebView.Editor {
 
     public static class EditorUtils {
+
+        public static void AssertThatOculusLowOverheadModeIsDisabled() {
+
+            if (!EditorUtils.XRSdkIsEnabled("oculus")) {
+                return;
+            }
+            var lowOverheadModeEnabled = false;
+            #if VUPLEX_OCULUS
+                // The Oculus XR plugin is installed
+                Unity.XR.Oculus.OculusLoader oculusLoader = Unity.XR.Oculus.OculusSettings.CreateInstance<Unity.XR.Oculus.OculusLoader>();
+                Unity.XR.Oculus.OculusSettings oculusSettings = oculusLoader.GetSettings();
+                lowOverheadModeEnabled = oculusSettings.LowOverheadMode;
+            #elif UNITY_2019_2_OR_NEWER && !UNITY_2020_1_OR_NEWER
+                // VROculus.lowOverheadMode is only supported from Unity 2019.2 - 2019.4
+                lowOverheadModeEnabled = PlayerSettings.VROculus.lowOverheadMode;
+            #endif
+            if (lowOverheadModeEnabled) {
+                throw new BuildFailedException("XR settings error: Vuplex 3D WebView requires that \"Low Overhead Mode\" be disabled in Oculus XR settings. Please disable Low Overhead Mode in Oculus XR settings.");
+            }
+        }
+
+        public static void AssertThatSrpBatcherIsDisabled() {
+
+            #if UNITY_2018_2_OR_NEWER && !VUPLEX_DISABLE_SRP_WARNING
+                if (UnityEngine.Rendering.GraphicsSettings.useScriptableRenderPipelineBatching) {
+                    throw new BuildFailedException("URP settings error: \"SRP Batcher\" is enabled in Universal Render Pipeline (URP) settings, but URP for Android has an issue that prevents 3D WebView's textures from showing up outside of a Canvas. If the project uses a WebViewPrefab, please go to \"UniversalRenderPipelineAsset\" -> \"Advanced\" and disable SRP Batcher. If the project only uses CanvasWebViewPrefab and not WebViewPrefab, you can instead add the scripting symbol VUPLEX_DISABLE_SRP_WARNING to the project to ignore this warning.");
+                }
+            #endif
+        }
 
         public static void CopyAndReplaceDirectory(string srcPath, string dstPath, bool ignoreMetaFiles = true) {
 
@@ -119,9 +151,51 @@ namespace Vuplex.WebView.Editor {
             return _returnOnePathOrThrow(files, expectedPath, directoryToSearch);
         }
 
-        public static string GetLinkColor() => EditorGUIUtility.isProSkin ? "#7faef0ff" : "#11468aff";
+        public static void ForceAndroidInternetPermission() {
 
-        public static string TextWithColor(string text, string color) => $"<color={color}>{text}</color>";
+            #if !VUPLEX_ANDROID_DISABLE_REQUIRE_INTERNET
+                if (!PlayerSettings.Android.forceInternetPermission) {
+                    PlayerSettings.Android.forceInternetPermission = true;
+                    WebViewLogger.LogWarning("Just a heads-up: 3D WebView changed the Android player setting \"Internet Access\" to \"Require\" to ensure that it can fetch web pages from the internet. (This message will only be logged once.)");
+                }
+            #endif
+        }
+
+        public static string GetLinkColor() {
+
+            return EditorGUIUtility.isProSkin ? "#7faef0ff" : "#11468aff";
+        }
+
+        public static string TextWithColor(string text, string color) {
+
+            return $"<color={color}>{text}</color>";
+        }
+
+        public static void ValidateAndroidGraphicsApi(bool native2DSupported = false) {
+
+            #if !VUPLEX_DISABLE_GRAPHICS_API_WARNING
+                var autoGraphicsApiEnabled = PlayerSettings.GetUseDefaultGraphicsAPIs(BuildTarget.Android);
+                var selectedGraphicsApi = PlayerSettings.GetGraphicsAPIs(BuildTarget.Android)[0];
+                var vulkanEnabled = selectedGraphicsApi == GraphicsDeviceType.Vulkan;
+                if (!(vulkanEnabled || autoGraphicsApiEnabled)) {
+                    // OpenGLES is selected, so nothing to warn about.
+                    return;
+                }
+                var warningPrefix = autoGraphicsApiEnabled ? "Auto Graphics API is enabled in Player Settings, which means that the Vulkan Graphics API may be used."
+                                                           : "The Vulkan Graphics API is enabled in Player Settings.";
+                #if UNITY_2020_2_OR_NEWER
+                    // At build time, XRSettings.enabled is always false, so to check if XR is enabled,
+                    // we must instead check whether XRSettings.supportedDevices[0] != "None".
+                    var xrDevices = VXUtils.XRSettings.supportedDevices;
+                    var xrIsEnabled = xrDevices.Length > 0 && xrDevices[0] != "None";
+                    if (!xrIsEnabled) {
+                        WebViewLogger.LogWarning($"{warningPrefix} 3D WebView for Android supports Vulkan, but{(native2DSupported ? " unless the application only uses webviews in Native 2D Mode, then" : "")} the target Android devices must support the Vulkan extension VK_ANDROID_external_memory_android_hardware_buffer. That extension is supported on newer devices like Oculus Quest but isn't supported on all Android phones that support Vulkan. If your application is intended for general Android phones, it's recommended to{(native2DSupported ? " either only use Native 2D Mode or to" : "")} change the project's selected Graphics API to OpenGLES in Player Settings.{(native2DSupported ? " If your application is already only using Native 2D Mode, then please ignore this message." : "")} For more details, see this page: <em>https://support.vuplex.com/articles/vulkan#android</em>");
+                    }
+                #else
+                    throw new BuildFailedException(warningPrefix + " 3D WebView for Android requires Unity 2020.2 or newer in order to support Vulkan. So, please either upgrade to a newer version of Unity or change the selected Graphics API to OpenGLES in Player Settings.");
+                #endif
+            #endif
+        }
 
         public static bool XRSdkIsEnabled(string sdkNameFragment) {
 

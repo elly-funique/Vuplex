@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -46,17 +46,13 @@ namespace Vuplex.WebView {
     public interface IWebView {
 
         /// <summary>
-        /// Indicates that JavaScript in the page has called window.close(). Calling window.close()
-        /// doesn't automatically close a webview, but the application can listen to this CloseRequested
-        /// event to detect when window.close() is called and then choose whether to destroy the
-        /// webview in response to it.
+        /// Indicates that the page has requested to close (i.e. via window.close()).
         /// </summary>
         /// <example>
         /// <code>
         /// await webViewPrefab.WaitUntilInitialized();
         /// webViewPrefab.WebView.CloseRequested += (sender, eventArgs) => {
-        ///     Debug.Log("Destroying the WebViewPrefab because window.close() was called.");
-        ///     webViewPrefab.Destroy();
+        ///     Debug.Log("Close requested");
         /// };
         /// </code>
         /// </example>
@@ -108,13 +104,7 @@ namespace Vuplex.WebView {
         event EventHandler<FocusedInputFieldChangedEventArgs> FocusedInputFieldChanged;
 
         /// <summary>
-        /// Indicates changes in the loading status of a web page. This event can be used, for example,
-        /// to detect when a page finishes loading or to implement a load progress bar. This event indicates
-        /// the following types of load events:<br/>
-        /// - `Started`: a new page started loading.<br/>
-        /// - `Updated`: the load progress percentage was updated.<br/>
-        /// - `Finished`: a page finished loading.<br/>
-        /// - `Failed`: a page failed to load.<br/>
+        /// Indicates that the page load progress changed.
         /// </summary>
         /// <remarks>
         /// For 2D WebView for WebGL, LoadProgressChanged only indicates the ProgressChangeType.Started and Finished events,
@@ -168,25 +158,6 @@ namespace Vuplex.WebView {
         /// </code>
         /// </example>
         event EventHandler PageLoadFailed;
-
-        /// <summary>
-        /// Indicates that the browser engine reported that its process for the webview terminated unexpectedly,
-        /// either because the web process crashed or because it was killed by the
-        /// operating system. The webview cannot be used after it has been terminated, so if this event occurs, the webview must be
-        /// destroyed, and then the appication can optionally create a new webview to replace it.
-        /// </summary>
-        /// <example>
-        /// <code>
-        /// await webViewPrefab.WaitUntilInitialized();
-        /// webViewPrefab.WebView.Terminated += (sender, eventArgs) => {
-        ///     Debug.Log("The web content process was terminated. Reason: " + eventArgs.Type);
-        ///     // Destroy the webview because it can't be used any more.
-        ///     webViewPrefab.Destroy();
-        ///     // TODO: If the application still needs a webview, it can create a new one with WebViewPrefab.Instantiate().
-        /// };
-        /// </code>
-        /// </example>
-        event EventHandler<TerminatedEventArgs> Terminated;
 
         /// <summary>
         /// Indicates that the page's title changed.
@@ -469,9 +440,7 @@ namespace Vuplex.WebView {
         /// </code>
         /// </example>
         /// <seealso cref="PageLoadScripts"/>
-        /// <seealso href="https://support.vuplex.com/articles/javascript-promise-result">How to get ExecuteJavaScript() to return the result of a Promise?</seealso>
         /// <seealso href="https://support.vuplex.com/articles/how-to-send-messages-from-javascript-to-c-sharp">JS-to-C# message passing</seealso>
-        /// <seealso href="https://support.vuplex.com/articles/how-to-get-html">How to get HTML, text, images, or other info from a web page?</seealso>
         Task<string> ExecuteJavaScript(string javaScript);
 
         /// <summary>
@@ -494,8 +463,7 @@ namespace Vuplex.WebView {
         /// </remarks>
         /// <example>
         /// <code>
-        /// var webView = webViewPrefab.WebView;
-        /// var textureData = await webView.GetRawTextureData();
+        /// var textureData = await webViewPrefab.WebView.GetRawTextureData();
         /// var texture = new Texture2D(
         ///     webView.Size.x,
         ///     webView.Size.y,
@@ -540,10 +508,7 @@ namespace Vuplex.WebView {
         Task Init(int width, int height);
 
         /// <summary>
-        /// Loads the web page contained in the given HTML string. Note that HTML loaded via this method
-        /// cannot load subresources (e.g. images, CSS, JavaScript) from the local file system (i.e. via file:// URLs).
-        /// If you need to load subresources from the local file system, please use one of the approaches described
-        /// in <see="https://support.vuplex.com/articles/how-to-load-local-files">this article</see> instead.
+        /// Loads the web page contained in the given HTML string.
         /// </summary>
         /// <example>
         /// <code>
@@ -760,28 +725,6 @@ namespace Vuplex.WebView {
         /// </example>
         /// <seealso cref="IWithKeyDownAndUp"/>
         void SendKey(string key);
-
-        /// <summary>
-        /// By default, if a web page doesn't specify a background, 3D WebView sets the page's
-        /// background to white because that's what web browsers typically do. However, an
-        /// application can use this method to disable the default white background so that pages
-        /// that don't set a background will instead have a transparent background. Note that this method
-        /// must be called before a web page is loaded in order for it to take effect for that page.
-        /// </summary>
-        /// <remarks>
-        /// Nearly all of the 3D WebView packages support transparent webviews, but there are two exceptions: <br/>
-        /// - 3D WebView for Android with Gecko Engine doesn't support transparency because the mobile Gecko browser engine doesn't currently support it.  <br/>
-        /// - 3D WebView for UWP doesn't support transparency on mixed reality headsets like Hololens.
-        /// </remarks>
-        /// <example>
-        /// <code>
-        /// await webViewPrefab.WaitUntilInitialized();
-        /// // Disable the default white background so the page can be transparent.
-        /// webViewPrefab.WebView.SetDefaultBackgroundEnabled(false);
-        /// </code>
-        /// </example>
-        /// <seealso href="https://support.vuplex.com/articles/how-to-make-a-webview-transparent">How to make a webview transparent?</seealso>
-        void SetDefaultBackgroundEnabled(bool enabled);
 
         /// <summary>
         /// Makes the webview take or relinquish focus.

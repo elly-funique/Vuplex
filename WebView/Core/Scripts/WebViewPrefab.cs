@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -61,7 +61,6 @@ namespace Vuplex.WebView {
         /// automatically shown when a text input in the webview is focused. The default for
         /// WebViewPrefab is `false`.
         /// </summary>
-        /// <seealso cref="IWithNativeOnScreenKeyboard"/>
         /// <remarks>
         /// The native on-screen keyboard is only supported for the following packages:
         /// <list type="bullet">
@@ -70,15 +69,8 @@ namespace Vuplex.WebView {
         /// </list>
         /// </remarks>
         /// <remarks>
-        /// 3D WebView for Android with Gecko Engine doesn't support automatically showing the native on-screen keyboard,
-        /// but you can use Unity's [TouchScreenKeyboard](https://docs.unity3d.com/ScriptReference/TouchScreenKeyboard.html)
-        /// API to show the keyboard and then send typed characters to the webview like described in [this article](https://support.vuplex.com/articles/how-to-use-a-third-party-keyboard).
-        /// </remarks>
-        /// <remarks>
         /// On iOS, disabling the keyboard for one webview disables it for all webviews.
         /// </remarks>
-        /// <seealso cref="IWithNativeOnScreenKeyboard"/>
-        /// <seealso cref="KeyboardEnabled"/>
         [Label("Native On-Screen Keyboard (Android and iOS only)")]
         [Header("Platform-specific")]
         [Tooltip("Determines whether the operating system's native on-screen keyboard is automatically shown when a text input in the webview is focused. The native on-screen keyboard is only supported for the following packages:\n• 3D WebView for Android (non-Gecko)\n• 3D WebView for iOS")]
@@ -156,8 +148,8 @@ namespace Vuplex.WebView {
         /// </summary>
         public static WebViewPrefab Instantiate(float width, float height, WebViewOptions options) {
 
-            var prefabPrototype = (GameObject)Resources.Load("WebViewPrefab");
-            var gameObject = (GameObject)Instantiate(prefabPrototype);
+            var prefabPrototype = (GameObject) Resources.Load("WebViewPrefab");
+            var gameObject = (GameObject) Instantiate(prefabPrototype);
             var webViewPrefab = gameObject.GetComponent<WebViewPrefab>();
             webViewPrefab._sizeForInitialization = new Vector2(width, height);
             webViewPrefab._options = options;
@@ -167,21 +159,12 @@ namespace Vuplex.WebView {
         /// <summary>
         /// Like Instantiate(float, float), except it initializes the instance with an existing, initialized
         /// IWebView instance. This causes the WebViewPrefab to use the existing
-        /// IWebView instance instead of creating a new one. This can be used, for example, to create multiple
-        /// WebViewPrefabs that are connected to the same IWebView, or to create a prefab for an IWebView
-        /// created by IWithPopups.PopupRequested.
+        /// IWebView instance instead of creating a new one.
         /// </summary>
-        /// <example>
-        /// <code>
-        /// await firstWebViewPrefab.WaitUntilInitialized();
-        /// var secondWebViewPrefab = WebViewPrefab.Instantiate(firstWebViewPrefab.WebView);
-        /// // TODO: Position secondWebViewPrefab to the location where you want to display it.
-        /// </code>
-        /// </example>
         public static WebViewPrefab Instantiate(IWebView webView) {
 
-            var prefabPrototype = (GameObject)Resources.Load("WebViewPrefab");
-            var gameObject = (GameObject)Instantiate(prefabPrototype);
+            var prefabPrototype = (GameObject) Resources.Load("WebViewPrefab");
+            var gameObject = (GameObject) Instantiate(prefabPrototype);
             var webViewPrefab = gameObject.GetComponent<WebViewPrefab>();
             webViewPrefab.SetWebViewForInitialization(webView);
             return webViewPrefab;
@@ -243,38 +226,33 @@ namespace Vuplex.WebView {
             return transform.Find("WebViewPrefabResizer/WebViewPrefabView").GetComponent<ViewportMaterialView>();
         }
 
-        async void _initWebViewPrefab() {
-            try {
-                OnInit();
+        void _initWebViewPrefab() {
 
-                #if VUPLEX_XR_INTERACTION_TOOLKIT
-                    WebViewLogger.LogWarning("It looks like you're using a WebViewPrefab with XR Interaction Toolkit. Please use a CanvasWebViewPrefab inside a world space Canvas instead. For more information, please see <em>https://support.vuplex.com/articles/xr-interaction-toolkit</em>.");
-                #endif
+            OnInit();
 
-                #if UNITY_ANDROID && UNITY_2018_2_OR_NEWER
-                    if (UnityEngine.Rendering.GraphicsSettings.useScriptableRenderPipelineBatching) {
-                        WebViewLogger.LogError("URP settings error: \"SRP Batcher\" is enabled in Universal Render Pipeline (URP) settings, but URP for Android has an issue that prevents 3D WebView's textures from showing up outside of a Canvas. Please either go to \"UniversalRenderPipelineAsset\" -> \"Advanced\" and disable SRP Batcher or switch to using CanvasWebViewPrefab.");
-                    }
-                #endif
+            #if VUPLEX_XR_INTERACTION_TOOLKIT
+                WebViewLogger.LogWarning("It looks like you're using a WebViewPrefab with XR Interaction Toolkit. Please use a CanvasWebViewPrefab inside a world space Canvas instead. For more information, please see <em>https://support.vuplex.com/articles/xr-interaction-toolkit</em>.");
+            #endif
 
-                if (_sizeForInitialization == Vector2.zero) {
-                    if (_webViewForInitialization != null) {
-                        _sizeForInitialization = (Vector2)_webViewForInitialization.Size / Resolution;
-                    } else {
-                        // The size was set via the editor instead of through arguments to Instantiate().
-                        _sizeForInitialization = transform.localScale;
-                        _resetLocalScale();
-                    }
+            #if UNITY_ANDROID && UNITY_2018_2_OR_NEWER
+                if (UnityEngine.Rendering.GraphicsSettings.useScriptableRenderPipelineBatching) {
+                    WebViewLogger.LogError("URP settings error: \"SRP Batcher\" is enabled in Universal Render Pipeline (URP) settings, but URP for Android has an issue that prevents 3D WebView's textures from showing up outside of a Canvas. Please either go to \"UniversalRenderPipelineAsset\" -> \"Advanced\" and disable SRP Batcher or switch to using CanvasWebViewPrefab.");
                 }
-                _viewResizer = transform.GetChild(0);
-                _videoRectPositioner = _viewResizer.Find("VideoRectPositioner");
-                _setViewSize(_sizeForInitialization.x, _sizeForInitialization.y);
-                await _initBase(new Rect(Vector2.zero, _sizeForInitialization));
-            } catch (Exception exception) {
-                // Catch any exceptions that occur during initialization because
-                // some applications terminate the application on uncaught exceptions.
-                Debug.LogException(exception);
+            #endif
+
+            if (_sizeForInitialization == Vector2.zero) {
+                if (_webViewForInitialization != null) {
+                    _sizeForInitialization = (Vector2)_webViewForInitialization.Size / Resolution;
+                } else {
+                    // The size was set via the editor instead of through arguments to Instantiate().
+                    _sizeForInitialization = transform.localScale;
+                    _resetLocalScale();
+                }
             }
+            _viewResizer = transform.GetChild(0);
+            _videoRectPositioner = _viewResizer.Find("VideoRectPositioner");
+            _setViewSize(_sizeForInitialization.x, _sizeForInitialization.y);
+            _initBase(new Rect(Vector2.zero, _sizeForInitialization));
         }
 
         /// <summary>

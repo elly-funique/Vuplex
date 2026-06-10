@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 using UnityEngine;
-using Vuplex.WebView;
 
-namespace Vuplex.Demos {
+namespace Vuplex.WebView.Demos {
 
     /// <summary>
-    /// Provides a simple example of using 3D WebView's scripting APIs.
+    /// Sets up the SimpleWebViewDemo scene, which displays a WebViewPrefab
+    /// with an on-screen keyboard in world space.
     /// </summary>
     /// <remarks>
     /// Links: <br/>
@@ -27,29 +27,60 @@ namespace Vuplex.Demos {
     /// </remarks>
     class SimpleWebViewDemo : MonoBehaviour {
 
-        WebViewPrefab webViewPrefab;
+        HardwareKeyboardListener _hardwareKeyboardListener;
+        WebViewPrefab _webViewPrefab;
 
         void Awake() {
 
             // Use a desktop User-Agent to request the desktop versions of websites.
             // https://developer.vuplex.com/webview/Web#SetUserAgent
+            // Call this from Awake() to ensure it's called before the webview initializes.
             Web.SetUserAgent(false);
         }
 
         async void Start() {
 
-            // Get a reference to the WebViewPrefab.
-            // https://support.vuplex.com/articles/how-to-reference-a-webview
-            webViewPrefab = GameObject.Find("WebViewPrefab").GetComponent<WebViewPrefab>();
+            // The WebViewPrefab's InitialUrl property is set via the editor, so it
+            // automatically loads that URL when it initializes.
+            _webViewPrefab = GameObject.Find("WebViewPrefab").GetComponent<WebViewPrefab>();
+            _setUpKeyboards();
 
-            // Wait for the prefab to initialize because its WebView property is null until then.
-            // https://developer.vuplex.com/webview/WebViewPrefab#WaitUntilInitialized
-            await webViewPrefab.WaitUntilInitialized();
+            // Wait for the WebViewPrefab to initialize, because the WebViewPrefab.WebView property
+            // is null until the prefab has initialized.
+            await _webViewPrefab.WaitUntilInitialized();
 
-            // After the prefab has initialized, you can use the IWebView APIs via its WebView property.
+            // The WebViewPrefab has initialized, so now we can use the IWebView APIs
+            // using its WebViewPrefab.WebView property.
             // https://developer.vuplex.com/webview/IWebView
-            webViewPrefab.WebView.UrlChanged += (sender, eventArgs) => {
+            _webViewPrefab.WebView.UrlChanged += (sender, eventArgs) => {
                 Debug.Log("[SimpleWebViewDemo] URL changed: " + eventArgs.Url);
+            };
+        }
+
+        void _setUpKeyboards() {
+
+            // Send keys from the hardware (USB or Bluetooth) keyboard to the webview.
+            // Use separate KeyDown() and KeyUp() methods if the webview supports
+            // it, otherwise just use IWebView.SendKey().
+            // https://developer.vuplex.com/webview/IWithKeyDownAndUp
+            _hardwareKeyboardListener = HardwareKeyboardListener.Instantiate();
+            _hardwareKeyboardListener.KeyDownReceived += (sender, eventArgs) => {
+                var webViewWithKeyDown = _webViewPrefab.WebView as IWithKeyDownAndUp;
+                if (webViewWithKeyDown != null) {
+                    webViewWithKeyDown.KeyDown(eventArgs.Value, eventArgs.Modifiers);
+                } else {
+                    _webViewPrefab.WebView.SendKey(eventArgs.Value);
+                }
+            };
+            _hardwareKeyboardListener.KeyUpReceived += (sender, eventArgs) => {
+                var webViewWithKeyUp = _webViewPrefab.WebView as IWithKeyDownAndUp;
+                webViewWithKeyUp?.KeyUp(eventArgs.Value, eventArgs.Modifiers);
+            };
+
+            // Also hook up the on-screen keyboard.
+            var keyboard = GameObject.FindObjectOfType<Keyboard>();
+            keyboard.InputReceived += (sender, eventArgs) => {
+                _webViewPrefab.WebView.SendKey(eventArgs.Value);
             };
         }
     }

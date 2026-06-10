@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -30,7 +30,12 @@ namespace Vuplex.WebView {
         // Deprecated
         public void CreateMaterial(Action<Material> callback) => callback(VXUtils.CreateDefaultMaterial());
 
-        public void EnableRemoteDebugging() => StandaloneWebView.EnableRemoteDebugging(8080);
+        public void EnableRemoteDebugging() {
+
+            var platform = Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor ? "Windows" : "macOS";
+            StandaloneWebView.EnableRemoteDebugging(8080);
+            WebViewLogger.Log($"Enabling remote debugging for {platform} on port 8080. Please visit http://localhost:8080 using a Chromium-based browser. For more info, see <em>https://support.vuplex.com/articles/how-to-debug-web-content#standalone</em>.");
+        }
 
         public void SetAutoplayEnabled(bool enabled) => StandaloneWebView.SetAutoplayEnabled(enabled);
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -34,6 +34,27 @@ namespace Vuplex.WebView {
     /// based on the operating system's default language: English, Spanish, French, German, Russian,
     /// Danish, Norwegian, and Swedish.
     /// </remarks>
+    /// <example>
+    /// <code>
+    /// // First, create a WebViewPrefab for our main web content.
+    /// var webViewPrefab = WebViewPrefab.Instantiate(0.6f, 0.3f);
+    /// webViewPrefab.transform.parent = transform;
+    /// webViewPrefab.transform.localPosition = new Vector3(0, 0f, 0.4f);
+    /// webViewPrefab.transform.LookAt(transform);
+    /// webViewPrefab.Initialized += (sender, e) => {
+    ///     webViewPrefab.WebView.LoadUrl("https://www.google.com");
+    /// };
+    /// // Add a Keyboard under the main webview.
+    /// var keyboard = Keyboard.Instantiate();
+    /// keyboard.transform.SetParent(webViewPrefab.transform, false);
+    /// keyboard.transform.localPosition = new Vector3(0, -0.31f, 0);
+    /// keyboard.transform.localEulerAngles = Vector3.zero;
+    /// // Hook up the keyboard so that characters are routed to the main webview.
+    /// keyboard.InputReceived += (sender, eventArgs) => {
+    ///     webViewPrefab.WebView.SendKey(eventArgs.Value);
+    /// };
+    /// </code>
+    /// </example>
     public class Keyboard : BaseKeyboard {
 
         /// <summary>
@@ -65,24 +86,15 @@ namespace Vuplex.WebView {
         /// <summary>
         /// Creates an instance using the default width and height.
         /// </summary>
-        /// <example>
-        /// <code>
-        /// // Add a keyboard under a WebViewPrefab.
-        /// var keyboard = Keyboard.Instantiate();
-        /// keyboard.transform.SetParent(webViewPrefab.transform, false);
-        /// keyboard.transform.localPosition = new Vector3(0, -0.31f, 0);
-        /// keyboard.transform.localEulerAngles = Vector3.zero;
-        /// </code>
-        /// </example>
         public static Keyboard Instantiate() => Instantiate(DEFAULT_KEYBOARD_WIDTH, DEFAULT_KEYBOARD_HEIGHT);
 
         /// <summary>
-        /// Like Instantiate(), but creates an instance using the specified width and height.
+        /// Creates an instance using the specified width and height.
         /// </summary>
         public static Keyboard Instantiate(float width, float height) {
 
-            var prefabPrototype = (GameObject)Resources.Load("Keyboard");
-            var gameObject = (GameObject)Instantiate(prefabPrototype);
+            var prefabPrototype = (GameObject) Resources.Load("Keyboard");
+            var gameObject = (GameObject) Instantiate(prefabPrototype);
             var keyboard = gameObject.GetComponent<Keyboard>();
             keyboard.transform.localScale = new Vector3(width, height, 1);
             return keyboard;

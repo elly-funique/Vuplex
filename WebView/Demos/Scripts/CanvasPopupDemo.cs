@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 using UnityEngine;
-using Vuplex.WebView;
 
-namespace Vuplex.Demos {
+namespace Vuplex.WebView.Demos {
 
     /// <summary>
     /// Sets up the CanvasPopupDemo scene, which demonstrates how to use
@@ -29,28 +28,34 @@ namespace Vuplex.Demos {
     /// </remarks>
     class CanvasPopupDemo : MonoBehaviour {
 
+        GameObject _canvas;
+        CanvasWebViewPrefab _focusedPrefab;
+        HardwareKeyboardListener _hardwareKeyboardListener;
+
         async void Start() {
 
-            var canvas = GameObject.Find("Canvas");
+            _canvas = GameObject.Find("Canvas");
             // Create a webview for the main content.
             var mainWebViewPrefab = CanvasWebViewPrefab.Instantiate();
             mainWebViewPrefab.Resolution = 1.5f;
             mainWebViewPrefab.PixelDensity = 2;
             mainWebViewPrefab.Native2DModeEnabled = true;
-            mainWebViewPrefab.transform.SetParent(canvas.transform, false);
+            mainWebViewPrefab.transform.SetParent(_canvas.transform, false);
 
             var rectTransform = mainWebViewPrefab.transform as RectTransform;
             rectTransform.anchoredPosition3D = Vector3.zero;
             rectTransform.offsetMin = Vector2.zero;
             rectTransform.offsetMax = Vector2.zero;
             mainWebViewPrefab.transform.localScale = Vector3.one;
+            _focusedPrefab = mainWebViewPrefab;
 
-            // Wait for the prefab to initialize because its WebView property is null until then.
-            // https://developer.vuplex.com/webview/WebViewPrefab#WaitUntilInitialized
+            _setUpKeyboards();
+
+            // Wait for the CanvasWebViewPrefab to initialize, because the CanvasWebViewPrefab.WebView property
+            // is null until the prefab has initialized.
             await mainWebViewPrefab.WaitUntilInitialized();
 
-            // After the prefab has initialized, you can use the IWithPopups API via its WebView property.
-            // https://developer.vuplex.com/webview/IWithPopups
+            // The CanvasWebViewPrefab has initialized, so now we can use its WebViewPrefab.WebView property.
             var webViewWithPopups = mainWebViewPrefab.WebView as IWithPopups;
             if (webViewWithPopups == null) {
                 mainWebViewPrefab.WebView.LoadHtml(NOT_SUPPORTED_HTML);
@@ -65,7 +70,9 @@ namespace Vuplex.Demos {
                 Debug.Log("Popup opened with URL: " + eventArgs.Url);
                 var popupPrefab = CanvasWebViewPrefab.Instantiate(eventArgs.WebView);
                 popupPrefab.Resolution = mainWebViewPrefab.Resolution;
-                popupPrefab.transform.SetParent(canvas.transform, false);
+                _focusedPrefab = popupPrefab;
+
+                popupPrefab.transform.SetParent(_canvas.transform, false);
                 var popupRectTransform = popupPrefab.transform as RectTransform;
                 popupRectTransform.anchoredPosition3D = Vector3.zero;
                 popupRectTransform.offsetMin = Vector2.zero;
@@ -79,8 +86,30 @@ namespace Vuplex.Demos {
                 await popupPrefab.WaitUntilInitialized();
                 popupPrefab.WebView.CloseRequested += (popupWebView, closeEventArgs) => {
                     Debug.Log("Closing the popup");
+                    _focusedPrefab = mainWebViewPrefab;
                     popupPrefab.Destroy();
                 };
+            };
+        }
+
+        void _setUpKeyboards() {
+
+            // Send keys from the hardware (USB or Bluetooth) keyboard to the webview.
+            // Use separate KeyDown() and KeyUp() methods if the webview supports
+            // it, otherwise just use IWebView.SendKey().
+            // https://developer.vuplex.com/webview/IWithKeyDownAndUp
+            _hardwareKeyboardListener = HardwareKeyboardListener.Instantiate();
+            _hardwareKeyboardListener.KeyDownReceived += (sender, eventArgs) => {
+                var webViewWithKeyDown = _focusedPrefab.WebView as IWithKeyDownAndUp;
+                if (webViewWithKeyDown != null) {
+                    webViewWithKeyDown.KeyDown(eventArgs.Value, eventArgs.Modifiers);
+                } else {
+                    _focusedPrefab.WebView.SendKey(eventArgs.Value);
+                }
+            };
+            _hardwareKeyboardListener.KeyUpReceived += (sender, eventArgs) => {
+                var webViewWithKeyUp = _focusedPrefab.WebView as IWithKeyDownAndUp;
+                webViewWithKeyUp?.KeyUp(eventArgs.Value, eventArgs.Modifiers);
             };
         }
 

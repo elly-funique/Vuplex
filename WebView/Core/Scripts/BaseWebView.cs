@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -23,9 +23,9 @@ using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.Rendering;
+using Vuplex.WebView.Internal;
 
-namespace Vuplex.WebView.Internal {
+namespace Vuplex.WebView {
 
     /// <summary>
     /// The base IWebView implementation, which is extended for each platform.
@@ -69,8 +69,6 @@ namespace Vuplex.WebView.Internal {
         public event EventHandler<EventArgs<string>> MessageEmitted;
 
         public event EventHandler PageLoadFailed;
-
-        public event EventHandler<TerminatedEventArgs> Terminated;
 
         public event EventHandler<EventArgs<string>> TitleChanged;
 
@@ -223,7 +221,7 @@ namespace Vuplex.WebView.Internal {
             } else {
                 var headerStrings = additionalHttpHeaders.Keys.Select(key => $"{key}: {additionalHttpHeaders[key]}").ToArray();
                 var newlineDelimitedHttpHeaders = String.Join("\n", headerStrings);
-                WebView_loadUrlWithHeaders(_nativeWebViewPtr, _transformUrlIfNeeded(url), newlineDelimitedHttpHeaders);
+                WebView_loadUrlWithHeaders(_nativeWebViewPtr, url, newlineDelimitedHttpHeaders);
             }
         }
 
@@ -249,10 +247,9 @@ namespace Vuplex.WebView.Internal {
         public virtual void PostMessage(string message) {
 
             var escapedString = message.Replace("\\", "\\\\")
-                                       .Replace("'", "\\'")
-                                       .Replace("\n", "\\n")
-                                       .Replace("\r", "\\r");
-            ExecuteJavaScript($"vuplex._emit('message', {{ data: '{escapedString}' }})", null);
+                                       .Replace("'", "\\\\'")
+                                       .Replace("\n", "\\\\n");
+            ExecuteJavaScript($"vuplex._emit('message', {{ data: \'{escapedString}\' }})", null);
         }
 
         public virtual void Reload() {
@@ -268,7 +265,7 @@ namespace Vuplex.WebView.Internal {
             }
             _assertValidState();
             _assertValidSize(width, height);
-            VXUtils.WarnIfAbnormallyLarge(width, height);
+            VXUtils.ThrowExceptionIfAbnormallyLarge(width, height);
             Size = new Vector2Int(width, height);
             _resize();
         }
@@ -327,12 +324,6 @@ namespace Vuplex.WebView.Internal {
         }
 
         public static void SetCameraAndMicrophoneEnabled(bool enabled) => WebView_setCameraAndMicrophoneEnabled(enabled);
-
-        public virtual void SetDefaultBackgroundEnabled(bool enabled) {
-
-            _assertValidState();
-            WebView_setDefaultBackgroundEnabled(_nativeWebViewPtr, enabled);
-        }
 
         public virtual void SetFocused(bool focused) {
 
@@ -418,7 +409,6 @@ namespace Vuplex.WebView.Internal {
                 _native2DPosition = new Vector2Int((int)value.x, (int)value.y);
             }
         }
-        static string[] STANDARD_URI_SCHEMES = new string[] { "http:", "https:", "file:", "about:" };
         static readonly Regex _streamingAssetsUrlRegex = new Regex(@"^streaming-assets:(//)?(.*)$", RegexOptions.IgnoreCase);
 
         protected void _assertPointIsWithinBounds(int xInPixels, int yInPixels) {
@@ -466,7 +456,7 @@ namespace Vuplex.WebView.Internal {
 
         protected virtual Task<Texture2D> _createTexture(int width, int height) {
 
-            VXUtils.WarnIfAbnormallyLarge(width, height);
+            VXUtils.ThrowExceptionIfAbnormallyLarge(width, height);
             var texture = new Texture2D(
                 width,
                 height,
@@ -475,7 +465,6 @@ namespace Vuplex.WebView.Internal {
                 false
             );
             #if UNITY_2020_2_OR_NEWER
-                var originalTexture = texture;
                 // In Unity 2020.2, Unity's internal TexturesD3D11.cpp class on Windows logs an error if
                 // UpdateExternalTexture() is called on a Texture2D created from the constructor
                 // rather than from Texture2D.CreateExternalTexture(). So, rather than returning
@@ -488,10 +477,8 @@ namespace Vuplex.WebView.Internal {
                     TextureFormat.RGBA32,
                     false,
                     false,
-                    originalTexture.GetNativeTexturePtr()
+                    texture.GetNativeTexturePtr()
                 );
-                // Destroy the original texture so that its memory is released.
-                Destroy(originalTexture);
             #endif
             return Task.FromResult(texture);
         }
@@ -582,10 +569,8 @@ namespace Vuplex.WebView.Internal {
         void HandleInitFinished(string unusedParam) {
 
             _initState = InitState.Initialized;
-            var taskSource = _initTaskSource;
+            _initTaskSource.SetResult(true);
             _initTaskSource = null;
-            // Call TaskCompletionSource.SetResult() last because any code awaiting the task will execute immediately when it's called.
-            taskSource.SetResult(true);
         }
 
         // Invoked by the native plugin.
@@ -609,31 +594,24 @@ namespace Vuplex.WebView.Internal {
 
             PageLoadFailed?.Invoke(this, EventArgs.Empty);
             OnLoadProgressChanged(new ProgressChangedEventArgs(ProgressChangeType.Failed, 1.0f));
-            var taskSource = _pageLoadFinishedTaskSource;
+            _pageLoadFinishedTaskSource?.SetException(new PageLoadFailedException("The current web page failed to load."));
             _pageLoadFinishedTaskSource = null;
             if (PageLoadFailed == null && LoadProgressChanged == null) {
                 // No handlers are attached to PageLoadFailed or LoadProgressChanged,
                 // so log a warning about the page load failure.
-                WebViewLogger.LogWarning("A web page failed to load. This can happen if the URL loaded is invalid or if the device has no network connection. To detect and handle page load failures like this, applications can use the IWebView.LoadProgressChanged event or the IWebView.PageLoadFailed event. You can disable this warning message by attaching an event handler to one of those events.");
-                if (Application.internetReachability == NetworkReachability.NotReachable) {
-                    WebViewLogger.LogError("The device is not connected to the internet (Application.internetReachability == NetworkReachability.NotReachable).");
-                }
+                WebViewLogger.LogWarning("A web page failed to load. This can happen if the URL loaded is invalid or if the device has no network connection. To detect and handle page load failures like this, applications can use the IWebView.LoadProgressChanged event or the IWebView.PageLoadFailed event.");
             }
-            // Call TaskCompletionSource.SetException() last because any code awaiting the task will execute immediately when it's called.
-            taskSource?.SetException(new PageLoadFailedException("The current web page failed to load."));
         }
 
         // Invoked by the native plugin.
         void HandleLoadFinished(string unusedParam) {
 
             OnLoadProgressChanged(new ProgressChangedEventArgs(ProgressChangeType.Finished, 1.0f));
-            var taskSource = _pageLoadFinishedTaskSource;
+            _pageLoadFinishedTaskSource?.SetResult(true);
             _pageLoadFinishedTaskSource = null;
             foreach (var script in PageLoadScripts) {
                 ExecuteJavaScript(script, null);
             }
-            // Call TaskCompletionSource.SetResult() last because any code awaiting the task will execute immediately when it's called.
-            taskSource?.SetResult(true);
         }
 
         // Invoked by the native plugin.
@@ -676,43 +654,19 @@ namespace Vuplex.WebView.Internal {
                     TitleChanged?.Invoke(this, new EventArgs<string>(Title));
                     break;
                 }
-                case "vuplex.webview.transparencyBlockedWarning": {
-                    var reason = StringBridgeMessage.ParseValue(serializedMessage);
-                    WebViewLogger.LogWarning($"Transparency has been enabled for the webview, but the web page's CSS explicitly sets a background, so the page probably won't be transparent as expected. Diagnosis: {reason} For more info, please see this page: https://support.vuplex.com/articles/how-to-make-a-webview-transparent#troubleshooting");
-                    break;
-                }
                 case "vuplex.webview.urlChanged": {
-                    _handleUrlChanged(serializedMessage);
+                    var action = JsonUtility.FromJson<UrlChangedMessage>(serializedMessage).urlAction;
+                    if (Url == action.Url) {
+                        return;
+                    }
+                    Url = action.Url;
+                    UrlChanged?.Invoke(this, new UrlChangedEventArgs(action.Url, action.Type));
                     break;
                 }
                 default: {
                     MessageEmitted?.Invoke(this, new EventArgs<string>(serializedMessage));
                     break;
                 }
-            }
-        }
-
-        // Invoked by the native plugin.
-        void HandleTerminated(string typeString) {
-
-            TerminationType type = TerminationType.Unknown;
-            switch (typeString) {
-                case "CRASHED":
-                    type = TerminationType.Crashed;
-                    break;
-                case "KILLED":
-                    type = TerminationType.Killed;
-                    break;
-                case "UNKNOWN":
-                    type = TerminationType.Unknown;
-                    break;
-                default:
-                    WebViewLogger.LogError("Unrecognized termination type: " + typeString);
-                    break;
-            }
-            Terminated?.Invoke(this, new TerminatedEventArgs(type));
-            if (Terminated.GetInvocationList().Length == 0) {
-                WebViewLogger.LogError($"The browser engine indicated that the browser's web content process terminated. Reason: {type}. You can detect and handle this condition using the IWebView.Terminated event. This message was logged because the application hasn't attached a handler to the Terminated event. For more details, please see this page: https://developer.vuplex.com/webview/IWebView#Terminated");
             }
         }
 
@@ -734,41 +688,6 @@ namespace Vuplex.WebView.Internal {
             }
         }
 
-        void _handleUrlChanged(string serializedMessage) {
-
-            var action = JsonUtility.FromJson<UrlChangedMessage>(serializedMessage).urlAction;
-            if (Url == action.Url) {
-                return;
-            }
-            // Custom URI schemes are only be emitted via IWebView.UrlChanged but not set as IWebView.Url.
-            var isCustomUriScheme = !STANDARD_URI_SCHEMES.Any(scheme => action.Url.StartsWith(scheme));
-            if (!isCustomUriScheme) {
-                Url = action.Url;
-            }
-
-            if (action.Url.StartsWith("https://accounts.google.com/v3/signin/rejected")) {
-                WebViewLogger.LogError(
-                    @"Google tries to block WebViews from signing into Google accounts, but a workaround is to use Web.SetUserAgent() to change the browser's User-Agent in Awake(), like this:
-                    void Awake() {
-                        #if UNITY_STANDALONE || UNITY_EDITOR
-                            // On Windows and macOS, change the User-Agent to mobile:
-                            Web.SetUserAgent(true);
-                        #elif UNITY_IOS
-                            // On iOS, change the User-Agent to desktop:
-                            Web.SetUserAgent(false);
-                        #else
-                            // Otherwise, change the User-Agent to a recent version of FireFox (Google blocks older versions).
-                            var firefox100ReleaseDate = DateTime.Parse(""2022-05-03"");
-                            var currentVersion = 100 + ((DateTime.Now.Year - firefox100ReleaseDate.Year) * 12) + DateTime.Now.Month - firefox100ReleaseDate.Month;
-                            Web.SetUserAgent($""Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:{currentVersion}.0) Gecko/20100101 Firefox/{currentVersion}.0"");
-                        #endif
-                    }"
-                );
-            }
-
-            UrlChanged?.Invoke(this, new UrlChangedEventArgs(action.Url, action.Type));
-        }
-
         protected async Task _initBase(int width, int height, bool createTexture = true, bool asyncInit = false) {
 
             if (_initState != InitState.Uninitialized) {
@@ -780,7 +699,7 @@ namespace Vuplex.WebView.Internal {
             // Assign the game object a unique name so that the native view can send it messages.
             gameObject.name = "WebView-" + Guid.NewGuid().ToString();
             Size = new Vector2Int(width, height);
-            VXUtils.WarnIfAbnormallyLarge(width, height);
+            VXUtils.ThrowExceptionIfAbnormallyLarge(width, height);
             // Prevent the script from automatically being destroyed when a new scene is loaded.
             DontDestroyOnLoad(gameObject);
             if (createTexture) {
@@ -794,27 +713,11 @@ namespace Vuplex.WebView.Internal {
             }
         }
 
-        static void _logSystemInfoIfNeeded() {
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void _logDeprecationErrorIfNeeded() {
 
-            #if !UNITY_EDITOR
-                var info = new System.Collections.Specialized.OrderedDictionary() {
-                    ["Unity version"] = Application.unityVersion,
-                    ["Development build"] = Debug.isDebugBuild,
-                    ["OS version"] = SystemInfo.operatingSystem,
-                    ["Device model"] = SystemInfo.deviceModel,
-                    ["Graphics API"] = SystemInfo.graphicsDeviceType,
-                #if UNITY_2019_3_OR_NEWER
-                    ["Rendering threading mode"] = SystemInfo.renderingThreadingMode,
-                #else
-                    ["Multithreaded rendering"] = PlayerSettings.MTRendering,
-                #endif
-                    ["Render pipeline"] = GraphicsSettings.renderPipelineAsset?.ToString() ?? "default",
-                #if UNITY_2018_2_OR_NEWER
-                    ["SRP Batcher"] = GraphicsSettings.useScriptableRenderPipelineBatching,
-                #endif
-                };
-                var infoString = String.Join("\n", info.Keys.Cast<string>().Select(key => $"{key}: {info[key]}"));
-                WebViewLogger.Log("System info (used by Vuplex support):\n" + infoString);
+            #if !(NET_4_6 || NET_STANDARD_2_0)
+                WebViewLogger.LogError("Support for the legacy .NET 3.5 runtime was removed in 3D WebView v4.0. Please switch to the .NET 4.x runtime.");
             #endif
         }
 
@@ -849,16 +752,6 @@ namespace Vuplex.WebView.Internal {
 
             _assertValidState();
             WebView_setFocusedInputFieldEventsEnabled(_nativeWebViewPtr, enabled);
-        }
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        static void _staticInit() {
-
-            #if !(NET_4_6 || NET_STANDARD_2_0)
-                WebViewLogger.LogError("Support for the legacy .NET 3.5 runtime was removed in 3D WebView v4.0. Please switch to the .NET 4.x runtime.");
-            #endif
-            Application.lowMemory += () => WebViewLogger.LogWarning("Low memory warning: Application.lowMemory indicated that the app has been notified of low memory. For tips on reducing memory usage, please see this article: https://support.vuplex.com/articles/how-to-reduce-memory");
-            _logSystemInfoIfNeeded();
         }
 
         protected string _transformUrlIfNeeded(string originalUrl) {
@@ -944,9 +837,6 @@ namespace Vuplex.WebView.Internal {
 
         [DllImport(_dllName)]
         static extern void WebView_setConsoleMessageEventsEnabled(IntPtr webViewPtr, bool enabled);
-
-        [DllImport(_dllName)]
-        static extern void WebView_setDefaultBackgroundEnabled(IntPtr webViewPtr, bool enabled);
 
         [DllImport(_dllName)]
         static extern void WebView_setFocused(IntPtr webViewPtr, bool focused);

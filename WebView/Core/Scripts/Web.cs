@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -14,7 +14,6 @@
 using System;
 using System.Threading.Tasks;
 using UnityEngine;
-using Vuplex.WebView.Internal;
 
 namespace Vuplex.WebView {
 
@@ -37,7 +36,7 @@ namespace Vuplex.WebView {
         /// - 2D WebView for WebGL
         /// </remarks>
         public static ICookieManager CookieManager {
-            get { return _pluginFactory.GetDefaultPlugin().CookieManager; }
+            get { return _pluginFactory.GetPlugin().CookieManager; }
         }
 
         /// <summary>
@@ -45,7 +44,7 @@ namespace Vuplex.WebView {
         /// installed for the current platform.
         /// </summary>
         public static WebPluginType DefaultPluginType {
-            get { return _pluginFactory.GetDefaultPlugin().Type; }
+            get { return _pluginFactory.GetPlugin().Type; }
         }
 
         /// <summary>
@@ -69,7 +68,7 @@ namespace Vuplex.WebView {
         /// <seealso cref="StandaloneWebView.DeleteAllCookies"/>
         public static void ClearAllData() {
 
-            _pluginFactory.GetAllPlugins().ForEach(p => p.ClearAllData());
+            _pluginFactory.GetPlugin().ClearAllData();
         }
 
         /// <summary>
@@ -94,7 +93,7 @@ namespace Vuplex.WebView {
         /// </example>
         public static IWebView CreateWebView() {
 
-            return _pluginFactory.GetDefaultPlugin().CreateWebView();
+            return _pluginFactory.GetPlugin().CreateWebView();
         }
 
         /// <summary>
@@ -111,14 +110,14 @@ namespace Vuplex.WebView {
         /// </remarks>
         public static IWebView CreateWebView(WebPluginType[] preferredPlugins) {
 
-            return _pluginFactory.GetDefaultPlugin(preferredPlugins).CreateWebView();
+            return _pluginFactory.GetPlugin(preferredPlugins).CreateWebView();
         }
 
         /// <summary>
         /// Enables [remote debugging](https://support.vuplex.com/articles/how-to-debug-web-content).
         /// </summary>
         /// <remarks>
-        /// On Windows and macOS, this method cannot be executed while the Chromium browser process is running. So, you will likely need to call it from Awake() to ensure that it's executed before Chromium is started. Alternatively, you can manually terminate Chromium prior to calling this method using StandaloneWebView.TerminateBrowserProcess().
+        /// On Windows and macOS, this method can only be called prior to initializing any webviews.
         /// </remarks>
         /// <example>
         /// <code>
@@ -129,7 +128,7 @@ namespace Vuplex.WebView {
         /// </example>
         public static void EnableRemoteDebugging() {
 
-            _pluginFactory.GetAllPlugins().ForEach(p => p.EnableRemoteDebugging());
+            _pluginFactory.GetPlugin().EnableRemoteDebugging();
         }
 
         /// <summary>
@@ -158,7 +157,7 @@ namespace Vuplex.WebView {
         /// </remarks>
         public static void SetAutoplayEnabled(bool enabled) {
 
-            _pluginFactory.GetAllPlugins().ForEach(p => p.SetAutoplayEnabled(enabled));
+            _pluginFactory.GetPlugin().SetAutoplayEnabled(enabled);
         }
 
         /// <summary>
@@ -190,7 +189,7 @@ namespace Vuplex.WebView {
         /// </example>
         public static void SetCameraAndMicrophoneEnabled(bool enabled) {
 
-            _pluginFactory.GetAllPlugins().ForEach(p => p.SetCameraAndMicrophoneEnabled(enabled));
+            _pluginFactory.GetPlugin().SetCameraAndMicrophoneEnabled(enabled);
         }
 
         /// <summary>
@@ -219,7 +218,7 @@ namespace Vuplex.WebView {
         /// </remarks>
         public static void SetIgnoreCertificateErrors(bool ignore) {
 
-            _pluginFactory.GetAllPlugins().ForEach(p => p.SetIgnoreCertificateErrors(ignore));
+            _pluginFactory.GetPlugin().SetIgnoreCertificateErrors(ignore);
         }
 
         /// <summary>
@@ -239,7 +238,7 @@ namespace Vuplex.WebView {
         /// </example>
         public static void SetStorageEnabled(bool enabled) {
 
-            _pluginFactory.GetAllPlugins().ForEach(p => p.SetStorageEnabled(enabled));
+            _pluginFactory.GetPlugin().SetStorageEnabled(enabled);
         }
 
         /// <summary>
@@ -263,7 +262,7 @@ namespace Vuplex.WebView {
         /// <seealso cref="IWithSettableUserAgent"/>
         public static void SetUserAgent(bool mobile) {
 
-            _pluginFactory.GetAllPlugins().ForEach(p => p.SetUserAgent(mobile));
+            _pluginFactory.GetPlugin().SetUserAgent(mobile);
         }
 
         /// <summary>
@@ -284,7 +283,7 @@ namespace Vuplex.WebView {
         /// <seealso cref="IWithSettableUserAgent"/>
         public static void SetUserAgent(string userAgent) {
 
-            _pluginFactory.GetAllPlugins().ForEach(p => p.SetUserAgent(userAgent));
+            _pluginFactory.GetPlugin().SetUserAgent(userAgent);
         }
 
         static internal void SetPluginFactory(WebPluginFactory pluginFactory) => _pluginFactory = pluginFactory;
@@ -300,13 +299,13 @@ namespace Vuplex.WebView {
         public static Task<Material> CreateMaterial() {
 
             var taskSource = new TaskCompletionSource<Material>();
-            _pluginFactory.GetDefaultPlugin().CreateMaterial(taskSource.SetResult);
+            _pluginFactory.GetPlugin().CreateMaterial(taskSource.SetResult);
             return taskSource.Task;
         }
 
         // Added in v3.8, deprecated in v4.0.
         [Obsolete(CreateMaterialMessage)]
-        public static void CreateMaterial(Action<Material> callback) => _pluginFactory.GetDefaultPlugin().CreateMaterial(callback);
+        public static void CreateMaterial(Action<Material> callback) => _pluginFactory.GetPlugin().CreateMaterial(callback);
 
         // Added in v3.10, removed in v4.0.
         [Obsolete(CreateTextureMessage, true)]

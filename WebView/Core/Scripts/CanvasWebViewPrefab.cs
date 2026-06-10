@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -13,11 +13,11 @@
 // limitations under the License.
 using System;
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.Serialization;
 using Vuplex.WebView.Internal;
 
-namespace Vuplex.WebView {
+namespace Vuplex.WebView
+{
 
     /// <summary>
     /// CanvasWebViewPrefab is a prefab that makes it easy to view and interact with an IWebView in a 2D Canvas.
@@ -48,28 +48,37 @@ namespace Vuplex.WebView {
     /// </list>
     /// </remarks>
     [HelpURL("https://developer.vuplex.com/webview/CanvasWebViewPrefab")]
-    public partial class CanvasWebViewPrefab : BaseWebViewPrefab {
+    public partial class CanvasWebViewPrefab : BaseWebViewPrefab
+    {
 
-        public override event EventHandler<ClickedEventArgs> Clicked {
-            add {
-                if (_native2DModeActive) {
+        public override event EventHandler<ClickedEventArgs> Clicked
+        {
+            add
+            {
+                if (_native2DModeActive)
+                {
                     _logNative2DModeWarning("The CanvasWebViewPrefab.Clicked event is not supported in Native 2D Mode.");
                 }
                 base.Clicked += value;
             }
-            remove {
+            remove
+            {
                 base.Clicked -= value;
             }
         }
 
-        public override event EventHandler<ScrolledEventArgs> Scrolled {
-            add {
-                if (_native2DModeActive) {
+        public override event EventHandler<ScrolledEventArgs> Scrolled
+        {
+            add
+            {
+                if (_native2DModeActive)
+                {
                     _logNative2DModeWarning("The CanvasWebViewPrefab.Scrolled event is not supported in Native 2D Mode.");
                 }
                 base.Scrolled += value;
             }
-            remove {
+            remove
+            {
                 base.Scrolled -= value;
             }
         }
@@ -101,7 +110,6 @@ namespace Vuplex.WebView {
         /// automatically shown when a text input in the webview is focused. The default for
         /// CanvasWebViewPrefab is `true`.
         /// </summary>
-        /// <seealso cref="IWithNativeOnScreenKeyboard"/>
         /// <remarks>
         /// The native on-screen keyboard is only supported for the following packages:
         /// <list type="bullet">
@@ -110,15 +118,8 @@ namespace Vuplex.WebView {
         /// </list>
         /// </remarks>
         /// <remarks>
-        /// 3D WebView for Android with Gecko Engine doesn't support automatically showing the native on-screen keyboard,
-        /// but you can use Unity's [TouchScreenKeyboard](https://docs.unity3d.com/ScriptReference/TouchScreenKeyboard.html)
-        /// API to show the keyboard and then send typed characters to the webview like described in [this article](https://support.vuplex.com/articles/how-to-use-a-third-party-keyboard).
-        /// </remarks>
-        /// <remarks>
         /// On iOS, disabling the keyboard for one webview disables it for all webviews.
         /// </remarks>
-        /// <seealso cref="IWithNativeOnScreenKeyboard"/>
-        /// <seealso cref="KeyboardEnabled"/>
         [Label("Native On-Screen Keyboard (Android and iOS only)")]
         [Tooltip("Determines whether the operating system's native on-screen keyboard is automatically shown when a text input in the webview is focused. The native on-screen keyboard is only supported for the following packages:\n• 3D WebView for Android (non-Gecko)\n• 3D WebView for iOS")]
         public bool NativeOnScreenKeyboardEnabled = true;
@@ -137,8 +138,8 @@ namespace Vuplex.WebView {
         /// [this support article](https://support.vuplex.com/articles/how-to-scale-web-content).
         /// </para>
         /// <para>
-        /// When running in [Native 2D Mode](https://support.vuplex.com/articles/native-2d-mode), the Resolution field
-        /// isn't used because the device's native resolution is used instead. So, the Resolution field's value is inaccurate and changes to it are ignored.
+        /// Changing the Resolution has no effect when running in [Native 2D Mode](https://support.vuplex.com/articles/native-2d-mode)
+        /// because it uses the device's native resolution.
         /// </para>
         /// </remarks>
         /// <example>
@@ -163,17 +164,22 @@ namespace Vuplex.WebView {
         [Tooltip("Determines the scroll sensitivity. Note that This property is ignored when running in Native 2D Mode.")]
         public float ScrollingSensitivity = 15;
 
-        public override bool Visible {
-            get {
+        public override bool Visible
+        {
+            get
+            {
                 var native2DWebView = _getNative2DWebViewIfActive();
-                if (native2DWebView != null) {
+                if (native2DWebView != null)
+                {
                     return native2DWebView.Visible;
                 }
                 return base.Visible;
             }
-            set {
+            set
+            {
                 var native2DWebView = _getNative2DWebViewIfActive();
-                if (native2DWebView != null) {
+                if (native2DWebView != null)
+                {
                     native2DWebView.SetVisible(value);
                     return;
                 }
@@ -205,7 +211,8 @@ namespace Vuplex.WebView {
         /// canvasWebViewPrefab.WebView.LoadUrl("https://vuplex.com");
         /// </code>
         /// </example>
-        public static CanvasWebViewPrefab Instantiate() {
+        public static CanvasWebViewPrefab Instantiate()
+        {
 
             return Instantiate(new WebViewOptions());
         }
@@ -214,7 +221,8 @@ namespace Vuplex.WebView {
         /// Like Instantiate(), except it also accepts an object
         /// of options flags that can be used to alter the generated webview's behavior.
         /// </summary>
-        public static CanvasWebViewPrefab Instantiate(WebViewOptions options) {
+        public static CanvasWebViewPrefab Instantiate(WebViewOptions options)
+        {
 
             var prefabPrototype = (GameObject)Resources.Load("CanvasWebViewPrefab");
             var gameObject = (GameObject)Instantiate(prefabPrototype);
@@ -224,20 +232,12 @@ namespace Vuplex.WebView {
         }
 
         /// <summary>
-        /// Like Instantiate(float, float), except it initializes the instance with an existing, initialized
+        /// Like Instantiate(), except it initializes the instance with an existing, initialized
         /// IWebView instance. This causes the CanvasWebViewPrefab to use the existing
-        /// IWebView instance instead of creating a new one. This can be used, for example, to create multiple
-        /// WebViewPrefabs that are connected to the same IWebView, or to create a prefab for an IWebView
-        /// created by IWithPopups.PopupRequested.
+        /// IWebView instance instead of creating a new one.
         /// </summary>
-        /// <example>
-        /// <code>
-        /// await firstWebViewPrefab.WaitUntilInitialized();
-        /// var secondWebViewPrefab = CanvasWebViewPrefab.Instantiate(firstWebViewPrefab.WebView);
-        /// // TODO: Position secondWebViewPrefab to the location where you want to display it.
-        /// </code>
-        /// </example>
-        public static CanvasWebViewPrefab Instantiate(IWebView webView) {
+        public static CanvasWebViewPrefab Instantiate(IWebView webView)
+        {
 
             var prefabPrototype = (GameObject)Resources.Load("CanvasWebViewPrefab");
             var gameObject = (GameObject)Instantiate(prefabPrototype);
@@ -246,46 +246,61 @@ namespace Vuplex.WebView {
             return canvasWebViewPrefab;
         }
 
-    #region Non-public members
+        #region Non-public members
         RectTransform _cachedRectTransform;
-        Canvas _canvas {
-            get {
-                if (_canvasGetter == null) {
+        Canvas _canvas
+        {
+            get
+            {
+                if (_canvasGetter == null)
+                {
                     _canvasGetter = new CachingGetter<Canvas>(GetComponentInParent<Canvas>, 1, this);
                 }
                 return _canvasGetter.GetValue();
             }
         }
         CachingGetter<Canvas> _canvasGetter;
-        bool _native2DModeActive {
-            get {
+        bool _native2DModeActive
+        {
+            get
+            {
                 var webViewWith2DMode = WebView as IWithNative2DMode;
                 return webViewWith2DMode != null && webViewWith2DMode.Native2DModeEnabled;
             }
         }
-        RectTransform _rectTransform {
-            get {
-                if (_cachedRectTransform == null) {
+        static Resolution _originalScreenResolution;
+        RectTransform _rectTransform
+        {
+            get
+            {
+                if (_cachedRectTransform == null)
+                {
                     _cachedRectTransform = GetComponent<RectTransform>();
                 }
                 return _cachedRectTransform;
             }
         }
+        bool _setCustomPointerInputDetector;
 
         // Partial method implemented by various 3D WebView packages
         // to provide platform-specific warnings.
         partial void OnInit();
 
-        bool _canNative2DModeBeEnabled(bool logWarnings = false) {
+        bool _canNative2DModeBeEnabled(bool logWarnings = false)
+        {
 
-            if (_canvas != null && _canvas.renderMode == RenderMode.WorldSpace) {
-                if (logWarnings) {
+            if (_canvas?.renderMode == RenderMode.WorldSpace)
+            {
+                if (logWarnings)
+                {
                     _logNative2DModeWarning("CanvasWebViewPrefab.Native2DModeEnabled is enabled but the canvas's render mode is set to World Space, so Native 2D Mode will not be enabled. In order to use Native 2D Mode, please switch the canvas's render mode to \"Screen Space - Overlay\" or \"Screen Space - Camera\".");
                 }
                 return false;
             }
-            if (VXUtils.XRSettings.enabled) {
-                if (logWarnings) {
+            if (VXUtils.XRSettings.enabled)
+            {
+                if (logWarnings)
+                {
                     _logNative2DModeWarning("CanvasWebViewPrefab.Native2DModeEnabled is enabled but XR is enabled, so Native 2D Mode will not be enabled.");
                 }
                 return false;
@@ -293,21 +308,23 @@ namespace Vuplex.WebView {
             return true;
         }
 
-        Rect _getRectForInitialization(bool preferNative2DMode) => preferNative2DMode ? _getScreenSpaceRect() : _rectTransform.rect;
+        protected override float _getResolution()
+        {
 
-        protected override float _getResolution() {
-
-            if (Resolution > 0f) {
+            if (Resolution > 0f)
+            {
                 return Resolution;
             }
             WebViewLogger.LogError("Invalid value set for CanvasWebViewPrefab.Resolution: " + Resolution);
             return 1;
         }
 
-        IWithNative2DMode _getNative2DWebViewIfActive() {
+        IWithNative2DMode _getNative2DWebViewIfActive()
+        {
 
             var webViewWith2DMode = WebView as IWithNative2DMode;
-            if (webViewWith2DMode != null && webViewWith2DMode.Native2DModeEnabled) {
+            if (webViewWith2DMode != null && webViewWith2DMode.Native2DModeEnabled)
+            {
                 return webViewWith2DMode;
             }
             return null;
@@ -317,10 +334,12 @@ namespace Vuplex.WebView {
 
         protected override float _getScrollingSensitivity() => ScrollingSensitivity;
 
-        Rect _getScreenSpaceRect() {
+        Rect _getScreenSpaceRect()
+        {
 
             var canvas = _canvas;
-            if (canvas == null) {
+            if (canvas == null)
+            {
                 WebViewLogger.LogError("Unable to determine the screen space rect for Native 2D Mode because the CanvasWebViewPrefab is not placed in a Canvas. Please place the CanvasWebViewPrefab as the child of a Unity UI Canvas.");
                 return Rect.zero;
             }
@@ -329,11 +348,15 @@ namespace Vuplex.WebView {
             var topLeftCorner = worldCorners[1];
             var bottomRightCorner = worldCorners[3];
 
-            if (canvas.renderMode != RenderMode.ScreenSpaceOverlay) {
+            if (canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            {
                 var camera = canvas.worldCamera;
-                if (camera == null) {
+                if (camera == null)
+                {
                     WebViewLogger.LogError("Unable to determine the screen space rect for Native 2D Mode because the Canvas's render camera is not set. Please set the Canvas's \"Render Camera\" setting or change its render mode to \"Screen Space - Overlay\".");
-                } else {
+                }
+                else
+                {
                     topLeftCorner = camera.WorldToScreenPoint(topLeftCorner);
                     bottomRightCorner = camera.WorldToScreenPoint(bottomRightCorner);
                 }
@@ -342,8 +365,10 @@ namespace Vuplex.WebView {
             var y = Screen.height - topLeftCorner.y;
             var width = bottomRightCorner.x - topLeftCorner.x;
             var height = topLeftCorner.y - bottomRightCorner.y;
+
             var scaleFactor = _getScreenSpaceScaleFactor();
-            if (scaleFactor != 1f) {
+            if (scaleFactor != 1f)
+            {
                 x *= scaleFactor;
                 y *= scaleFactor;
                 width *= scaleFactor;
@@ -352,126 +377,123 @@ namespace Vuplex.WebView {
             return new Rect(x, y, width, height);
         }
 
-        // Provides a scale factor to account for an issue where GetWorldCorners() is incorrect in the following scenarios:
-        // - If the screen resolution is changed at runtime using Screen.SetResolution().
-        // - If the "Resolution Scaling Mode" is set to "Fixed DPI" in Player Settings -> Resolution and Presentation (on Android).
-        float _getScreenSpaceScaleFactor() {
+        float _getScreenSpaceScaleFactor()
+        {
 
-            var display = Display.main;
-            if (display.renderingWidth == display.systemHeight && display.renderingHeight == display.systemWidth) {
-                // Some old versions of Unity (like 2019.4.33) have a bug in the Android player where after the device
-                // is rotated, the Display's rendering width and height are swapped but the system width and height aren't.
-                // Return 1 in that scenario to prevent computing an incorrect scale factor.
-                return 1f;
+            // GetWorldCorners() has an issue where it's incorrect if the screen resolution
+            // is changed at runtime using Screen.SetResolution(). So, detect if the screen
+            // resolution has been changed and scale the rect's values accordingly.
+            var screenResolutionHasChanged = !_resolutionsAreEqual(Screen.currentResolution, _originalScreenResolution);
+            if (screenResolutionHasChanged)
+            {
+                float scaleFactor = (float)_originalScreenResolution.width / (float)Screen.currentResolution.width;
+                return scaleFactor;
             }
-            // Notes:
-            // - This approach doesn't work for detecting when "Resolution Scaling Mode" is set to "Fixed DPI" on iOS because
-            //   display.systemWidth is equal to display.renderingWidth on iOS in that scenario. However, the native iOS plugin
-            //   applies its own scale factor that works correctly for "Fixed DPI".
-            // - If an Android device has a notch and the "Render outside safe area" option is disabled, then the renderingWidth will be
-            //   equal to the Screen.safeArea.width, which is less than the systemWidth. Unfortunately, it doesn't appear to
-            //   be possible to detect if the "Resolution Scaling Mode" is set to "Fixed DPI" in that scenario because it doesn't
-            //   appear to be possible to detect the "Fixed DPI" setting in native code like it is on iOS.
-            // - It's important to also check that display.systemWidth != Screen.currentResolution.width because on UWP,
-            //   display.renderingWidth != display.systemWidth is true whenever the app's window isn't full screen, but
-            //   display.systemWidth and Screen.currentResolution.width are still equal in that scenario.
-            // - This method used to work by comparing the current Screen.currentResolution to the original value of
-            //   Screen.currentResolution from when the app started, but that approach caused an issue on iPads because
-            //   Screen.currentResolution changes when multiple apps are shown side-by-side with the iPad's Split View.
-            var screenHasNotchAndRenderOutsideSafeAreaIsDisabled = false;
-            #if UNITY_ANDROID && !UNITY_EDITOR
-                screenHasNotchAndRenderOutsideSafeAreaIsDisabled = AndroidUtils.ScreenHasNotchAndRenderOutsideSafeAreaIsDisabled();
-            #endif
-            var screenResolutionChanged = display.renderingWidth != display.systemWidth &&
-                                          !screenHasNotchAndRenderOutsideSafeAreaIsDisabled &&
-                                          display.systemWidth != Screen.currentResolution.width;
-            if (screenResolutionChanged) {
+            // On Android and iOS, GetWorldCorners() is also incorrect if the "Resolution Scaling Mode"
+            // is set to "Fixed DPI" in Player Settings -> Resolution and Presentation.
+#if UNITY_ANDROID || UNITY_IOS
+            var display = Display.main;
+            var resolutionScalingModeIsFixedDpi = display.renderingWidth != display.systemWidth;
+            if (resolutionScalingModeIsFixedDpi)
+            {
                 float scaleFactor = (float)display.systemWidth / (float)display.renderingWidth;
                 return scaleFactor;
             }
+#endif
             return 1f;
         }
 
-        protected override ViewportMaterialView _getVideoLayer() {
+        protected override ViewportMaterialView _getVideoLayer()
+        {
 
-            var obj = transform.Find("VideoLayer");
-            return obj == null ? null : obj.GetComponent<ViewportMaterialView>();
+            return transform.Find("VideoLayer").GetComponent<ViewportMaterialView>();
         }
 
-        protected override ViewportMaterialView _getView() {
+        protected override ViewportMaterialView _getView()
+        {
 
-            var obj = transform.Find("CanvasWebViewPrefabView");
-            return obj == null ? null : obj.GetComponent<ViewportMaterialView>();
+            return transform.Find("CanvasWebViewPrefabView").GetComponent<ViewportMaterialView>();
         }
 
-        async void _initCanvasPrefab() {
-            try {
-                OnInit();
-                Initialized += _logNative2DRecommendationIfNeeded;
-                var preferNative2DMode = Native2DModeEnabled && _canNative2DModeBeEnabled(true);
-                var rect = _getRectForInitialization(preferNative2DMode);
-                if (_sizeIsInvalid(rect.size)) {
-                    // If the prefab is nested in a LayoutGroup, its width and height will be zero on the first frame,
-                    // so it's necessary to pass the LayoutGroup's RectTransform LayoutRebuilder.ForceRebuildLayoutImmediate().
-                    // https://forum.unity.com/threads/force-immediate-layout-update.372630
-                    var layoutGroup = GetComponentInParent<LayoutGroup>();
-                    if (layoutGroup != null) {
-                        LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)layoutGroup.transform);
-                        rect = _getRectForInitialization(preferNative2DMode);
-                    }
-                }
-                if (_logErrorIfSizeIsInvalid(rect.size)) {
-                    return;
-                }
-                await _initBase(rect, preferNative2DMode);
-            } catch (Exception exception) {
-                // Catch any exceptions that occur during initialization because
-                // some applications terminate the application on uncaught exceptions.
-                Debug.LogException(exception);
+        void _initCanvasPrefab()
+        {
+            OnInit();
+            Initialized += _logNative2DRecommendationIfNeeded;
+            var preferNative2DMode = Native2DModeEnabled && _canNative2DModeBeEnabled(true);
+            var rect = preferNative2DMode ? _getScreenSpaceRect() : _rectTransform.rect;
+            if (_logErrorIfSizeIsInvalid(rect.size))
+            {
+                return;
             }
+            _initBase(rect, preferNative2DMode);
         }
 
-        bool _logErrorIfSizeIsInvalid(Vector2 size) {
+        bool _logErrorIfSizeIsInvalid(Vector2 size)
+        {
 
-            if (_sizeIsInvalid(size)) {
+            if (!(size.x > 0f && size.y > 0f))
+            {
                 WebViewLogger.LogError($"CanvasWebViewPrefab dimensions are invalid! Width: {size.x.ToString("f4")}, Height: {size.y.ToString("f4")}. To correct this, please adjust the CanvasWebViewPrefab's RectTransform to make it so that its width and height are both greater than zero. https://docs.unity3d.com/Packages/com.unity.ugui@1.0/manual/class-RectTransform.html");
                 return true;
             }
             return false;
         }
 
-        void _logNative2DModeWarning(string message) {
+        void _logNative2DModeWarning(string message)
+        {
 
             WebViewLogger.LogWarning(message + " For more info, please see this article: <em>https://support.vuplex.com/articles/native-2d-mode</em>");
         }
 
-        void _logNative2DRecommendationIfNeeded(object sender, EventArgs eventArgs) {
+        void _logNative2DRecommendationIfNeeded(object sender, EventArgs eventArgs)
+        {
 
             var webViewWith2DMode = WebView as IWithNative2DMode;
-            if (_canNative2DModeBeEnabled() && webViewWith2DMode != null && !webViewWith2DMode.Native2DModeEnabled) {
+            if (_canNative2DModeBeEnabled() && webViewWith2DMode != null && !webViewWith2DMode.Native2DModeEnabled)
+            {
                 WebViewLogger.LogTip("This platform supports Native 2D Mode, so consider enabling CanvasWebViewPrefab.Native2DModeEnabled for best results. For more info, see https://support.vuplex.com/articles/native-2d-mode .");
             }
         }
 
-        void OnDisable() {
+        void OnDisable()
+        {
 
             // When in Native 2D Mode, hide the webview when the CanvasWebViewPrefab is deactivated.
             var webView = _getNative2DWebViewIfActive();
-            if (webView != null) {
+            if (webView != null)
+            {
                 webView.SetVisible(false);
             }
         }
 
-        void OnEnable() {
+        void OnEnable()
+        {
 
             // When in Native 2D Mode, show the webview when the CanvasWebViewPrefab is activated.
             var webView = _getNative2DWebViewIfActive();
-            if (webView != null) {
+            if (webView != null)
+            {
                 webView.SetVisible(true);
             }
         }
 
-        protected override void _setVideoLayerPosition(Rect videoRect) {
+        bool _resolutionsAreEqual(Resolution res1, Resolution res2)
+        {
+
+            if (res1.width == res2.width && res1.height == res2.height)
+            {
+                return true;
+            }
+            // On mobile, the width and height may be switched due to screen rotation.
+            if (res1.width == res2.height && res1.height == res2.width)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        protected override void _setVideoLayerPosition(Rect videoRect)
+        {
 
             var videoRectTransform = _videoLayer.transform as RectTransform;
             // Use Vector2.Scale() because Vector2 * Vector2 isn't supported in Unity 2017.
@@ -479,25 +501,31 @@ namespace Vuplex.WebView {
             videoRectTransform.sizeDelta = Vector2.Scale(videoRect.size, _rectTransform.rect.size);
         }
 
-        bool _sizeIsInvalid(Vector2 size) => !(size.x > 0f && size.y > 0f);
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void _saveOriginalScreenResolution() => _originalScreenResolution = Screen.currentResolution;
 
         void Start() => _initCanvasPrefab();
 
-        protected override void Update() {
+        protected override void Update()
+        {
 
             base.Update();
-            if (WebView == null) {
+            if (WebView == null)
+            {
                 return;
             }
             _sizeInUnityUnits = _rectTransform.rect.size;
-            if (_logErrorIfSizeIsInvalid(_sizeInUnityUnits)) {
+            if (_logErrorIfSizeIsInvalid(_sizeInUnityUnits))
+            {
                 return;
             }
             // Handle updating the rect for a native 2D webview.
             var native2DWebView = _getNative2DWebViewIfActive();
-            if (native2DWebView != null) {
+            if (native2DWebView != null)
+            {
                 var screenSpaceRect = _getScreenSpaceRect();
-                if (native2DWebView.Rect != screenSpaceRect) {
+                if (native2DWebView.Rect != screenSpaceRect)
+                {
                     native2DWebView.SetRect(screenSpaceRect);
                 }
                 return;
@@ -505,27 +533,28 @@ namespace Vuplex.WebView {
             // Handle resizing a regular webview.
             _resizeWebViewIfNeeded();
         }
-    #endregion
+        #endregion
 
-    #region Obsolete APIs
+        #region Obsolete APIs
         // Added in v3.2, removed in v3.12.
         [Obsolete("CanvasWebViewPrefab.Init() has been removed. The CanvasWebViewPrefab script now initializes itself automatically, so Init() no longer needs to be called.", true)]
-        public void Init() {}
+        public void Init() { }
 
         // Added in v3.2, removed in v3.12.
         [Obsolete("CanvasWebViewPrefab.Init() has been removed. The CanvasWebViewPrefab script now initializes itself automatically, so Init() no longer needs to be called.", true)]
-        public void Init(WebViewOptions options) {}
+        public void Init(WebViewOptions options) { }
 
         // Added in v3.10, removed in v3.12.
         [Obsolete("CanvasWebViewPrefab.Init() has been removed. The CanvasWebViewPrefab script now initializes itself automatically, so Init() no longer needs to be called. Please use CanvasWebViewPrefab.SetWebViewForInitialization(IWebView) instead.", true)]
-        public void Init(IWebView webView) {}
+        public void Init(IWebView webView) { }
 
         // Deprecated in v4.0.
         [Obsolete("CanvasWebViewPrefab.InitialResolution is now deprecated. Please use CanvasWebViewPrefab.Resolution instead.")]
-        public float InitialResolution {
+        public float InitialResolution
+        {
             get { return Resolution; }
             set { Resolution = value; }
         }
-    #endregion
+        #endregion
     }
 }

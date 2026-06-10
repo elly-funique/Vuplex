@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -28,9 +28,8 @@ namespace Vuplex.WebView.Editor {
         [MenuItem("Vuplex/Enable Proprietary Video Codecs")]
         public static void ShowWindow() {
 
-            EditorWindow.GetWindowWithRect(
+            EditorWindow.GetWindow(
                 typeof(StandaloneVideoCodecsWindow),
-                new Rect(0, 0, 500, 500),
                 true,
                 "Enable Proprietary Video Codecs | Vuplex"
             );

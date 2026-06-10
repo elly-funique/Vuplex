@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -17,21 +17,16 @@ namespace Vuplex.WebView {
     /// Options for how drag interactions affect
     /// WebViewPrefab and CanvasWebViewPrefab.
     /// </summary>
-    /// <seealso cref="WebViewPrefab.DragMode"/>
-    /// <seealso cref="CanvasWebViewPrefab.DragMode"/>
     public enum DragMode {
 
         /// <summary>
-        /// Drag interactions trigger scrolling (default). On platforms that support
-        /// IWithTouch, touch events are used instead of mouse events. On platforms
-        /// that don't support IWithTouch, mouse events are used, but dragging
-        /// causes the page to be scrolled with IWebView.Scroll().
+        /// Drag interactions trigger scrolling (default).
         /// </summary>
         DragToScroll,
 
         /// <summary>
         /// Drag interactions trigger dragging within the web page
-        /// via mouse events (e.g. dragging to select text, drag-and-drop).
+        /// (e.g. drag-and-drop, dragging to select text).
         /// </summary>
         /// <remarks>
         /// For information on the limitations of drag interactions on iOS and UWP, please see

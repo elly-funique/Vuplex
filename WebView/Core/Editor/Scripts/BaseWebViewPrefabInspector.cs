@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -24,7 +24,6 @@ namespace Vuplex.WebView.Editor {
             _dragMode = serializedObject.FindProperty("DragMode");
             _dragThreshold = serializedObject.FindProperty("DragThreshold");
             _hoveringEnabled = serializedObject.FindProperty("HoveringEnabled");
-            _keyboardEnabled = serializedObject.FindProperty("KeyboardEnabled");
             _logConsoleMessages = serializedObject.FindProperty("LogConsoleMessages");
             _resolution = serializedObject.FindProperty("Resolution");
             _initialUrl = serializedObject.FindProperty("InitialUrl");
@@ -43,7 +42,6 @@ namespace Vuplex.WebView.Editor {
             EditorGUILayout.PropertyField(_initialUrl);
             EditorGUILayout.PropertyField(_resolution);
             EditorGUILayout.PropertyField(_dragMode);
-            EditorGUILayout.PropertyField(_keyboardEnabled);
 
             EditorGUILayout.Space();
             _renderCustomPlatformSpecificSettings();
@@ -88,7 +86,6 @@ namespace Vuplex.WebView.Editor {
         SerializedProperty _dragMode;
         SerializedProperty _dragThreshold;
         SerializedProperty _hoveringEnabled;
-        SerializedProperty _keyboardEnabled;
         SerializedProperty _logConsoleMessages;
         SerializedProperty _resolution;
         SerializedProperty _initialUrl;

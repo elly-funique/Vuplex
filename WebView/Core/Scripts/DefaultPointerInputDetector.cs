@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -17,6 +17,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using Vuplex.WebView.Internal;
+
 #if VUPLEX_MRTK
     using Microsoft.MixedReality.Toolkit.Input;
 #endif
@@ -44,9 +45,7 @@ namespace Vuplex.WebView {
 
         public event EventHandler<PointerEventArgs> PointerDown;
 
-        public event EventHandler PointerEntered;
-
-        public event EventHandler<EventArgs<Vector2>> PointerExited;
+        public event EventHandler PointerExited;
 
         public event EventHandler<EventArgs<Vector2>> PointerMoved;
 
@@ -88,25 +87,13 @@ namespace Vuplex.WebView {
         public void OnPointerEnter(PointerEventData eventData) {
 
             _isHovering = true;
-            _raisePointerEnteredEvent(EventArgs.Empty);
         }
 
         /// <see cref="IPointerExitHandler"/>
         public void OnPointerExit(PointerEventData eventData) {
 
             _isHovering = false;
-            // When StandaloneInputModule triggers OnPointerExit, eventData.pointerCurrentRaycast.worldPosition is usually Vector3.zero,
-            // so for world space, just fallback to sending a normalized point of Vector2.zero.
-            var point = _positionIsZero(eventData) ? Vector2.zero : _convertToNormalizedPoint(eventData);
-            // Since this is an exit event, the coordinate can sometimes be just outside the bounds of [0, 1], so clamp it to [0, 1].
-            for (var i = 0; i < 2; i++) {
-                if (point[i] < 0f) {
-                    point[i] = 0f;
-                } else if (point[i] > 1f) {
-                    point[i] = 1f;
-                }
-            }
-            _raisePointerExitedEvent(new EventArgs<Vector2>(point));
+            _raisePointerExitedEvent(EventArgs.Empty);
         }
 
         /// <see cref="IPointerUpHandler"/>
@@ -118,7 +105,10 @@ namespace Vuplex.WebView {
         /// <see cref="IScrollHandler"/>
         public void OnScroll(PointerEventData eventData) {
 
-            var scrollDelta = -1 * eventData.scrollDelta;
+            var scrollDelta = new Vector2(
+                -eventData.scrollDelta.x,
+                -eventData.scrollDelta.y
+            );
             _raiseScrolledEvent(new ScrolledEventArgs(scrollDelta, _convertToNormalizedPoint(eventData)));
         }
 
@@ -142,21 +132,9 @@ namespace Vuplex.WebView {
         }
 
         protected virtual Vector2 _convertToNormalizedPoint(Vector3 worldPosition) {
-
             // Note: transform.parent is WebViewPrefabResizer
             var localPosition = transform.parent.InverseTransformPoint(worldPosition);
-            var point = new Vector2(1 - localPosition.x, -1 * localPosition.y);
-            // In some cases, the point may be outside the range of [0, 1], so we need to clamp it to [0, 1]. Scenarios where that's the case:
-            // - OnPointerExit()
-            // - OnPointerUp(), if the mouse button is released after dragging outside of the webview.
-            for (var i = 0; i < 2; i++) {
-                if (point[i] < 0f) {
-                    point[i] = 0f;
-                } else if (point[i] > 1f) {
-                    point[i] = 1f;
-                }
-            }
-            return point;
+            return new Vector2(1 - localPosition.x, -1 * localPosition.y);
         }
 
         PointerEventArgs _convertToPointerEventArgs(PointerEventData eventData) {
@@ -173,63 +151,58 @@ namespace Vuplex.WebView {
         /// <summary>
         /// Unity's event system doesn't include a standard pointer event
         /// for hovering (i.e. there's no `IPointerHoverHandler` interface).
-        /// So, this method implements the equivalent functionality for different input modules.
+        /// So, this method implements the equivalent functionality by
+        /// using the protected `PointerInputModule.GetLastPointerEventData()`
+        /// method to detect where the pointer is hovering.
         /// </summary>
         PointerEventData _getLastPointerEventData() {
 
-            var currentInputModule = EventSystem.current == null ? null : EventSystem.current.currentInputModule;
-            // Support for input modules that derive from PointerInputModule, like StandaloneInputModule.
-            var pointerInputModule = currentInputModule as PointerInputModule;
-            if (pointerInputModule != null) {
-                // Use reflection to get access to the protected GetPointerData()
-                // method. Unity isn't going to change this API because most input modules
-                // extend PointerInputModule. Note that GetPointerData() is used instead
-                // of GetLastPointerEventData() because the latter doesn't work with
-                // the Oculus SDK's OVRInputModule.
-                var args = new object[] { PointerInputModule.kMouseLeftId, null, false };
-                pointerInputModule.GetType().InvokeMember(
-                    "GetPointerData",
-                    BindingFlags.InvokeMethod | BindingFlags.Instance | BindingFlags.NonPublic,
-                    null,
-                    pointerInputModule,
-                    args
-                );
-                // The second argument is an out param.
-                var pointerEventData = args[1] as PointerEventData;
-                return pointerEventData;
-            }
-
-            #if ENABLE_INPUT_SYSTEM
-                // Support for the new InputSystem's InputSystemUIInputModule.
-                var uiInputModule = currentInputModule as UnityEngine.InputSystem.UI.InputSystemUIInputModule;
-                if (uiInputModule != null) {
-                    var pointerEventData = new PointerEventData(EventSystem.current);
-                    var raycastResult = uiInputModule.GetLastRaycastResult(0);
-                    pointerEventData.position = raycastResult.screenPosition;
-                    pointerEventData.pointerCurrentRaycast = uiInputModule.GetLastRaycastResult(0);
-                    return pointerEventData;
-                }
-            #endif
-
-            #if VUPLEX_XR_INTERACTION_TOOLKIT
-                // Support for XR Interaction Toolkit.
-                return Internal.XritPointerEventHelper.Instance.LastPointerEventData;
-            #else
+            var pointerInputModule = EventSystem.current?.currentInputModule as PointerInputModule;
+            if (pointerInputModule == null) {
                 return null;
-            #endif
+            }
+            // Use reflection to get access to the protected `GetPointerData()`
+            // method. Unity isn't going to change this API because most input modules
+            // extend PointerInputModule. Note that `GetPointerData()` is used instead
+            // of `GetLastPointerEventData()` because the latter doesn't work with
+            // the Oculus SDK's OVRInputModule.
+            var args = new object[] { PointerInputModule.kMouseLeftId, null, false };
+            pointerInputModule.GetType().InvokeMember(
+                "GetPointerData",
+                BindingFlags.InvokeMethod | BindingFlags.Instance | BindingFlags.NonPublic,
+                null,
+                pointerInputModule,
+                args
+            );
+            // The second argument is an out param.
+            var pointerEventData = args[1] as PointerEventData;
+            return pointerEventData;
         }
 
-        protected virtual bool _positionIsZero(PointerEventData eventData) => eventData.pointerCurrentRaycast.worldPosition == Vector3.zero;
+        protected virtual bool _positionIsZero(PointerEventData eventData) {
 
-        protected void _raiseBeganDragEvent(EventArgs<Vector2> eventArgs) => BeganDrag?.Invoke(this, eventArgs);
+            return eventData.pointerCurrentRaycast.worldPosition == Vector3.zero;
+        }
 
-        protected void _raiseDraggedEvent(EventArgs<Vector2> eventArgs) => Dragged?.Invoke(this, eventArgs);
+        protected void _raiseBeganDragEvent(EventArgs<Vector2> eventArgs) {
 
-        protected void _raisePointerDownEvent(PointerEventArgs eventArgs) => PointerDown?.Invoke(this, eventArgs);
+            BeganDrag?.Invoke(this, eventArgs);
+        }
 
-        protected void _raisePointerEnteredEvent(EventArgs eventArgs) => PointerEntered?.Invoke(this, eventArgs);
+        protected void _raiseDraggedEvent(EventArgs<Vector2> eventArgs) {
 
-        protected void _raisePointerExitedEvent(EventArgs<Vector2> eventArgs) => PointerExited?.Invoke(this, eventArgs);
+            Dragged?.Invoke(this, eventArgs);
+        }
+
+        protected void _raisePointerDownEvent(PointerEventArgs eventArgs) {
+
+            PointerDown?.Invoke(this, eventArgs);
+        }
+
+        protected void _raisePointerExitedEvent(EventArgs eventArgs) {
+
+            PointerExited?.Invoke(this, eventArgs);
+        }
 
         void _raisePointerMovedIfNeeded() {
 
@@ -240,24 +213,34 @@ namespace Vuplex.WebView {
             if (pointerEventData == null) {
                 return;
             }
-            var point = _convertToNormalizedPoint(pointerEventData);
-            if (!(point.x >= 0f && point.y >= 0f)) {
+            var screenPoint = _convertToNormalizedPoint(pointerEventData);
+            if (!(screenPoint.x >= 0f && screenPoint.y >= 0f)) {
                 // This can happen while the prefab is being resized.
                 return;
             }
-            _raisePointerMovedEvent(new EventArgs<Vector2>(point));
+            _raisePointerMovedEvent(new EventArgs<Vector2>(screenPoint));
         }
 
-        protected void _raisePointerMovedEvent(EventArgs<Vector2> eventArgs) => PointerMoved?.Invoke(this, eventArgs);
+        protected void _raisePointerMovedEvent(EventArgs<Vector2> eventArgs) {
 
-        protected void _raisePointerUpEvent(PointerEventArgs eventArgs) => PointerUp?.Invoke(this, eventArgs);
+            PointerMoved?.Invoke(this, eventArgs);
+        }
 
-        protected void _raiseScrolledEvent(ScrolledEventArgs eventArgs) => Scrolled?.Invoke(this, eventArgs);
+        protected void _raisePointerUpEvent(PointerEventArgs eventArgs) {
 
-        protected virtual void Update() => _raisePointerMovedIfNeeded();
+            PointerUp?.Invoke(this, eventArgs);
+        }
+
+        protected void _raiseScrolledEvent(ScrolledEventArgs eventArgs) {
+
+            Scrolled?.Invoke(this, eventArgs);
+        }
+
+        void Update() => _raisePointerMovedIfNeeded();
 
     // Code specific to Microsoft's Mixed Reality Toolkit.
     #if VUPLEX_MRTK
+
         bool _beganDragEmitted;
 
         /// <see cref="IMixedRealityPointerHandler"/>

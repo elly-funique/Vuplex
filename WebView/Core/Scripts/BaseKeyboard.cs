@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -11,7 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#pragma warning disable CS0067
 using System;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -22,9 +21,9 @@ namespace Vuplex.WebView {
     public abstract class BaseKeyboard : MonoBehaviour {
 
         /// <summary>
-        /// Indicates that the user pressed a key on the keyboard.
+        /// Indicates that the user clicked a key on the keyboard.
         /// </summary>
-        public event EventHandler<EventArgs<string>> KeyPressed;
+        public event EventHandler<EventArgs<string>> InputReceived;
 
         /// <summary>
         /// Indicates that the keyboard finished initializing.
@@ -63,8 +62,6 @@ namespace Vuplex.WebView {
             return taskSource.Task;
         }
 
-        internal BaseWebViewPrefab BaseWebViewPrefab { get { return _webViewPrefab; }}
-
         bool _isInitialized;
         [SerializeField]
         [HideInInspector]
@@ -82,7 +79,6 @@ namespace Vuplex.WebView {
         async protected void _init() {
 
             _webViewPrefab.CursorIconsEnabled = false;
-            _webViewPrefab.KeyboardEnabled = false;
             // Reset InitialUrl to null in case the developer modified WebViewPrefab.prefab to set a default InitialUrl.
             _webViewPrefab.InitialUrl = null;
             await _webViewPrefab.WaitUntilInitialized();
@@ -105,15 +101,7 @@ namespace Vuplex.WebView {
             if (!String.IsNullOrWhiteSpace(CustomKeyboardUrl)) {
                 _webViewPrefab.WebView.LoadUrl(CustomKeyboardUrl.Trim());
             } else {
-                _webViewPrefab.WebView.LoadHtml(KeyboardUI.Html);
-            }
-        }
-
-        void OnDestroy() {
-
-            var keyboardInstance = Internal.KeyboardManager.Instance;
-            if (keyboardInstance != null) {
-                keyboardInstance.RemoveKeyboard(this);
+                _webViewPrefab.WebView.LoadHtml(KeyboardUi.Html);
             }
         }
 
@@ -124,12 +112,11 @@ namespace Vuplex.WebView {
             switch (messageType) {
                 case "keyboard.inputReceived":
                     var input = StringBridgeMessage.ParseValue(serializedMessage);
-                    KeyPressed?.Invoke(this, new EventArgs<string>(input));
+                    InputReceived?.Invoke(this, new EventArgs<string>(input));
                     break;
                 case "keyboard.initialized":
                     _sendKeyboardLanguageMessage();
                     _isInitialized = true;
-                    Internal.KeyboardManager.Instance.AddKeyboard(this);
                     Initialized?.Invoke(this, EventArgs.Empty);
                     break;
             }
@@ -181,9 +168,5 @@ namespace Vuplex.WebView {
                 }
             }
         }
-
-        // Added in v1.0, removed in v4.3.
-        [Obsolete("Keyboard.InputReceived was removed in v4.3 because WebViewPrefab and CanvasWebViewPrefab now automatically handle keyboard input by default. Please remove your code that references Keyboard.InputReceived, and keyboard support will still work. For more info, including details about how you can still access keyboard input programmatically, please see this article: https://support.vuplex.com/articles/keyboard", true)]
-        public event EventHandler<EventArgs<string>> InputReceived;
     }
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -20,7 +20,6 @@ using VuplexOptionalDependencyAttribute = Vuplex.WebView.Editor.OptionalDependen
 // Detect if specific packages are installed and, if so,
 // define scripting symbols so that 3D WebView can handle them.
 [assembly: VuplexOptionalDependency("Unity.XR.Oculus.OculusLoader", "VUPLEX_OCULUS")]
-[assembly: VuplexOptionalDependency("OVRProjectConfig", "VUPLEX_OCULUS_PROJECT_CONFIG")]
 [assembly: VuplexOptionalDependency("UnityEngine.XR.Interaction.Toolkit.XRBaseInteractor", "VUPLEX_XR_INTERACTION_TOOLKIT")]
 [assembly: VuplexOptionalDependency("Microsoft.MixedReality.Toolkit.MixedRealityToolkit", "VUPLEX_MRTK")]
 [assembly: VuplexOptionalDependency("Vuplex.WebView.StandaloneWebPlugin", "VUPLEX_STANDALONE")]

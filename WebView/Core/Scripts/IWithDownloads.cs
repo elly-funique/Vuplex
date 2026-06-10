@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -22,36 +22,28 @@ namespace Vuplex.WebView {
     /// When downloads are enabled enabled, files are downloaded to Application.temporaryCachePath, but you can move them to a different
     /// location after they finish downloading.
     /// </remarks>
-    /// <remarks>
-    /// On iOS, downloads are only supported on iOS 14.5 or newer because older versions of iOS lack download support.
-    /// On versions of iOS older than 14.5, enabling downloads has no effect.
-    /// </remarks>
     /// <example>
     /// <code>
     /// await webViewPrefab.WaitUntilInitialized();
     /// var webViewWithDownloads = webViewPrefab.WebView as IWithDownloads;
-    /// if (webViewWithDownloads == null) {
-    ///     Debug.Log("This 3D WebView plugin doesn't yet support IWithDownloads: " + webViewPrefab.WebView.PluginType);
-    ///     return;
+    /// if (webViewWithDownloads != null) {
+    ///     webViewWithDownloads.SetDownloadsEnabled(true);
+    ///     webViewWithDownloads.DownloadProgressChanged += (sender, eventArgs) => {
+    ///         Debug.Log(
+    ///             $@"DownloadProgressChanged:
+    ///             Type: {eventArgs.Type},
+    ///             Url: {eventArgs.Url},
+    ///             Progress: {eventArgs.Progress},
+    ///             Id: {eventArgs.Id},
+    ///             FilePath: {eventArgs.FilePath},
+    ///             ContentType: {eventArgs.ContentType}"
+    ///         );
+    ///         if (eventArgs.Type == ProgressChangeType.Finished) {
+    ///             Debug.Log("Download finished");
+    ///             File.Move(eventArgs.FilePath, someOtherLocation);
+    ///         }
+    ///     };
     /// }
-    /// webViewWithDownloads.SetDownloadsEnabled(true);
-    /// webViewWithDownloads.DownloadProgressChanged += (sender, eventArgs) => {
-    ///     Debug.Log(
-    ///         $@"DownloadProgressChanged:
-    ///         Type: {eventArgs.Type},
-    ///         Url: {eventArgs.Url},
-    ///         Progress: {eventArgs.Progress},
-    ///         Id: {eventArgs.Id},
-    ///         FilePath: {eventArgs.FilePath},
-    ///         ContentType: {eventArgs.ContentType}"
-    ///     );
-    ///     if (eventArgs.Type == ProgressChangeType.Finished) {
-    ///         Debug.Log("Download finished");
-    ///         // Now that the file has finished downloading, do something with it.
-    ///         // For example, you can move it to a different location.
-    ///         File.Move(eventArgs.FilePath, someOtherLocation);
-    ///     }
-    /// };
     /// </code>
     /// </example>
     public interface IWithDownloads {

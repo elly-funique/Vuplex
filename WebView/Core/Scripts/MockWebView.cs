@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -40,8 +40,6 @@ namespace Vuplex.WebView {
         public event EventHandler<EventArgs<string>> MessageEmitted;
 
         public event EventHandler PageLoadFailed;
-
-        public event EventHandler<TerminatedEventArgs> Terminated;
 
         public event EventHandler<EventArgs<string>> TitleChanged;
 
@@ -97,9 +95,6 @@ namespace Vuplex.WebView {
 
             _assertValidNormalizedPoint(point);
             _log($"Click({point.ToString("n4")}, {preventStealingFocus})");
-            if (_moreDetailsClickRect.Contains(point)) {
-                Application.OpenURL("https://support.vuplex.com/articles/mock-webview");
-            }
         }
 
         public void Copy() {
@@ -275,8 +270,6 @@ namespace Vuplex.WebView {
             return Task.FromResult(true);
         }
 
-        public void SetDefaultBackgroundEnabled(bool enabled) => _log($"SetDefaultBackgroundEnabled({enabled})");
-
         public void SetFocused(bool focused) => _log($"SetFocused({focused})");
 
         public void SetRenderingEnabled(bool enabled) => _log($"SetRenderingEnabled({enabled})");
@@ -295,7 +288,6 @@ namespace Vuplex.WebView {
 
         public void ZoomOut() => _log("ZoomOut()");
 
-        Rect _moreDetailsClickRect = new Rect(0.67f, 0.7f, 0.17f, 0.11f);
         TaskCompletionSource<bool> _pageLoadFinishedTaskSource;
 
         // Partial methods implemented by other 3D WebView packages
@@ -312,8 +304,6 @@ namespace Vuplex.WebView {
         partial void OnLoadHtml();
         partial void OnLoadUrl(string url);
         partial void OnPaste();
-        partial void OnZoomIn();
-        partial void OnZoomOut();
 
         void _assertValidNormalizedPoint(Vector2 normalizedPoint) {
 

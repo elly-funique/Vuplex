@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -22,13 +22,10 @@ namespace Vuplex.WebView.Internal {
     /// </summary>
     public static class CursorHelper {
 
-        /// <param name="cursorType">The cursor icon type, or null to reset to the default cursor.</param>
         public static void SetCursorIcon(string cursorType) {
 
-            CursorInfo cursorInfo = null;
-            if (cursorType != null) {
-                _supportedCursors.TryGetValue(cursorType, out cursorInfo);
-            }
+            CursorInfo cursorInfo;
+            _supportedCursors.TryGetValue(cursorType, out cursorInfo);
             if (cursorInfo == null) {
                 Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
                 return;

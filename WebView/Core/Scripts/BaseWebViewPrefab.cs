@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -45,16 +45,6 @@ namespace Vuplex.WebView {
         public event EventHandler Initialized;
 
         /// <summary>
-        /// Indicates that the pointer (e.g. mouse cursor) entered the prefab.
-        /// </summary>
-        public event EventHandler PointerEntered;
-
-        /// <summary>
-        /// Indicates that the pointer (e.g. mouse cursor) exited the prefab.
-        /// </summary>
-        public event EventHandler PointerExited;
-
-        /// <summary>
         /// Indicates that the prefab was scrolled. Note that the prefab automatically
         /// calls IWebView.Scroll() for you.
         /// </summary>
@@ -96,9 +86,6 @@ namespace Vuplex.WebView {
         ///   <item>
         ///     For information on the limitations of drag interactions on iOS and UWP, please see
         ///     [this article](https://support.vuplex.com/articles/hover-and-drag-limitations).
-        ///   </item>
-        ///   <item>
-        ///     The Android Gecko package doesn't support the HTML Drag and Drop API (GeckoView limitation).
         ///   </item>
         /// </list>
         /// </remarks>
@@ -154,14 +141,6 @@ namespace Vuplex.WebView {
         [Tooltip("You can set this to the URL that you want to load, or you can leave it blank if you'd rather add a script to load content programmatically with IWebView.LoadUrl() or LoadHtml().")]
         [HideInInspector]
         public string InitialUrl;
-
-        /// <summary>
-        /// Determines whether the webview automatically receives keyboard input from the native keyboard and the Keyboard prefab. The default is `true`.
-        /// </summary>
-        /// <seealso cref="NativeOnScreenKeyboardEnabled">NativeOnScreenKeyboardEnabled</seealso>
-        /// <seealso href="https://support.vuplex.com/articles/keyboard">How does keyboard input work?</seealso>
-        [Tooltip("Determines whether the webview automatically receives keyboard input from the native keyboard and the Keyboard prefab.")]
-        public bool KeyboardEnabled = true;
 
         /// <summary>
         /// Determines whether JavaScript console messages from IWebView.ConsoleMessageLogged
@@ -280,36 +259,6 @@ namespace Vuplex.WebView {
         /// during initialization. This method can only be called prior to
         /// when the prefab initializes (i.e. directly after instantiating it or setting it to active).
         /// </summary>
-        /// <example>
-        /// <code>
-        /// using System;
-        /// using UnityEngine;
-        /// using Vuplex.WebView;
-        ///
-        /// class SetOptions : MonoBehaviour {
-        ///
-        ///     // IMPORTANT: With this approach, you must set your WebViewPrefab or CanvasWebViewPrefab to inactive
-        ///     //            in the scene hierarchy so that this script can manually activate it. Otherwise, this
-        ///     //            script won't be able to call SetOptionsForInitialization() before the prefab initializes.
-        ///     //
-        ///     // TODO: Set this webViewPrefab field to the inactive WebViewPrefab or CanvasWebViewPrefab in your scene
-        ///     //       via the Editor's Inspector tab.
-        ///     public BaseWebViewPrefab webViewPrefab;
-        ///
-        ///     void Awake() {
-        ///
-        ///         if (webViewPrefab.gameObject.activeInHierarchy) {
-        ///             throw new Exception("The WebViewPrefab object is active in the Editor's scene view. Please set it to inactive so that this script can manually activate it.");
-        ///         }
-        ///         webViewPrefab.gameObject.SetActive(true);
-        ///
-        ///         webViewPrefab.SetOptionsForInitialization(new WebViewOptions {
-        ///             preferredPlugins = new WebPluginType[] { WebPluginType.Android }
-        ///         });
-        ///     }
-        /// }
-        /// </code>
-        /// </example>
         public void SetOptionsForInitialization(WebViewOptions options) {
 
             if (WebView != null) {
@@ -387,12 +336,11 @@ namespace Vuplex.WebView {
         [HideInInspector]
         ViewportMaterialView _cachedView;
         IWebView _cachedWebView;
+        // Used for DragMode.DragToScroll and DragMode.Disabled
+        bool _clickIsPending;
         bool _consoleMessageLoggedHandlerAttached;
         bool _dragThresholdReached;
-        bool _dragToScrollClickIsPending;
-        bool _hasOverriddenCursorIcon;
         int _heightInPixels { get { return (int)(_sizeInUnityUnits.y * _appliedResolution); }}
-        bool _keyboardHasBeenEnabled;
         bool _loggedDragWarning;
         static bool _loggedHoverWarning;
         protected WebViewOptions _options;
@@ -453,7 +401,10 @@ namespace Vuplex.WebView {
 
         void _attachWebViewEventHandlers(IWebView webView) {
 
-            _enableConsoleMessagesIfNeeded(webView);
+            if (LogConsoleMessages) {
+                _consoleMessageLoggedHandlerAttached = true;
+                webView.ConsoleMessageLogged += WebView_ConsoleMessageLogged;
+            }
             // Needed for Vulkan support on Android.
             // See the comments in IWithChangingTexture.cs for details.
             var webViewWithChangingTexture = webView as IWithChangingTexture;
@@ -465,6 +416,11 @@ namespace Vuplex.WebView {
             if (webViewWithFallbackVideo != null && !_options.disableVideo) {
                 webViewWithFallbackVideo.VideoRectChanged += (sender, eventArgs) => _setVideoRect(eventArgs.Value);
             }
+        }
+
+        Vector2Int _convertNormalizedToPixels(Vector2 normalizedPoint) {
+
+            return new Vector2Int((int)(normalizedPoint.x * _widthInPixels), (int)(normalizedPoint.y * _heightInPixels));
         }
 
         void _disableHoveringIfNeeded(bool preferNative2DMode) {
@@ -485,27 +441,11 @@ namespace Vuplex.WebView {
             #endif
         }
 
-        void _enableConsoleMessagesIfNeeded(IWebView webView) {
-
-            if (LogConsoleMessages && !_consoleMessageLoggedHandlerAttached && webView != null) {
-                _consoleMessageLoggedHandlerAttached = true;
-                webView.ConsoleMessageLogged += WebView_ConsoleMessageLogged;
-            }
-        }
-
         void _enableNativeOnScreenKeyboardIfNeeded(IWebView webView) {
 
             if (webView is IWithNativeOnScreenKeyboard) {
                 var nativeOnScreenKeyboardEnabled = _getNativeOnScreenKeyboardEnabled();
                 (webView as IWithNativeOnScreenKeyboard).SetNativeOnScreenKeyboardEnabled(nativeOnScreenKeyboardEnabled);
-            }
-        }
-
-        void _enableOrDisableKeyboardIfNeeded() {
-
-            if (_keyboardHasBeenEnabled != KeyboardEnabled) {
-                Internal.KeyboardManager.Instance.SetKeyboardEnabled(this, KeyboardEnabled);
-                _keyboardHasBeenEnabled = KeyboardEnabled;
             }
         }
 
@@ -528,22 +468,11 @@ namespace Vuplex.WebView {
 
         protected abstract float _getScrollingSensitivity();
 
-        IWithTouch _getTouchIfSupported() {
-
-            var webViewWithTouch = WebView as IWithTouch;
-            // Touch is currently disabled for the Android Gecko package because it currently has an
-            // issue where scrolling doesn't work correctly with touch.
-            if (webViewWithTouch != null && WebView.PluginType != WebPluginType.AndroidGecko) {
-                return webViewWithTouch;
-            }
-            return null;
-        }
-
         protected abstract ViewportMaterialView _getVideoLayer();
 
         protected abstract ViewportMaterialView _getView();
 
-        protected async Task _initBase(Rect rect, bool preferNative2DMode = false) {
+        protected async void _initBase(Rect rect, bool preferNative2DMode = false) {
 
             _throwExceptionIfInitialized();
             _sizeInUnityUnits = rect.size;
@@ -553,14 +482,8 @@ namespace Vuplex.WebView {
             // Note: this.WebView is only set after the webview has been initialized to guarantee
             // that the property is ready to use as long as it's not null.
             var webView = await _initWebView(rect, preferNative2DMode);
-            if (this == null) {
-                // This prefab was destroyed while waiting for the webview to initialize.
-                webView.Dispose();
-                return;
-            }
             _initViews(webView);
             _enableNativeOnScreenKeyboardIfNeeded(webView);
-            _enableOrDisableKeyboardIfNeeded();
             _attachWebViewEventHandlers(webView);
             // Init the pointer input detector just before setting WebView so that
             // SetPointerInputDetector() will behave correctly if it's called before WebView is set.
@@ -637,7 +560,6 @@ namespace Vuplex.WebView {
             if (webViewWithCursorType != null && CursorIconsEnabled && !VXUtils.XRSettings.enabled) {
                 webViewWithCursorType.CursorTypeChanged += (sender, eventArgs) => {
                     Internal.CursorHelper.SetCursorIcon(eventArgs.Value);
-                    _hasOverriddenCursorIcon = eventArgs.Value != "default";
                 };
             }
 
@@ -650,7 +572,6 @@ namespace Vuplex.WebView {
                 previousPointerInputDetector.BeganDrag -= InputDetector_BeganDrag;
                 previousPointerInputDetector.Dragged -= InputDetector_Dragged;
                 previousPointerInputDetector.PointerDown -= InputDetector_PointerDown;
-                previousPointerInputDetector.PointerEntered -= InputDetector_PointerEntered;
                 previousPointerInputDetector.PointerExited -= InputDetector_PointerExited;
                 previousPointerInputDetector.PointerMoved -= InputDetector_PointerMoved;
                 previousPointerInputDetector.PointerUp -= InputDetector_PointerUp;
@@ -666,7 +587,6 @@ namespace Vuplex.WebView {
             _pointerInputDetector.BeganDrag += InputDetector_BeganDrag;
             _pointerInputDetector.Dragged += InputDetector_Dragged;
             _pointerInputDetector.PointerDown += InputDetector_PointerDown;
-            _pointerInputDetector.PointerEntered += InputDetector_PointerEntered;
             _pointerInputDetector.PointerExited += InputDetector_PointerExited;
             _pointerInputDetector.PointerMoved += InputDetector_PointerMoved;
             _pointerInputDetector.PointerUp += InputDetector_PointerUp;
@@ -685,7 +605,9 @@ namespace Vuplex.WebView {
                 return;
             }
             var newNormalizedDragPoint = eventArgs.Value;
-            var totalDragDeltaInPixels = WebView.NormalizedToPoint(_pointerDownNormalizedPoint - newNormalizedDragPoint);
+            var previousNormalizedDragPoint = _previousNormalizedDragPoint;
+            _previousNormalizedDragPoint = newNormalizedDragPoint;
+            var totalDragDeltaInPixels = _convertNormalizedToPixels(_pointerDownNormalizedPoint - newNormalizedDragPoint);
             if (!_dragThresholdReached) {
                 // _dragThresholdReached needs to be saved, otherwise it could flip from true back
                 // to false if the user drags back to the original point where the drag started.
@@ -698,28 +620,14 @@ namespace Vuplex.WebView {
                 return;
             }
             // DragMode is DragToScroll
-            var webViewWithTouch = _getTouchIfSupported();
-            if (webViewWithTouch != null && _dragThresholdReached && !_options.clickWithoutStealingFocus) {
-                webViewWithTouch.SendTouchEvent(new TouchEvent {
-                    TouchID = 1,
-                    Point = newNormalizedDragPoint,
-                    Type = TouchEventType.Move
-                });
-                return;
-            }
-            var normalizedDragDelta = _previousNormalizedDragPoint - newNormalizedDragPoint;
-            if (WebView.NormalizedToPoint(normalizedDragDelta) == Vector2Int.zero) {
-                // The latest drag delta was less than one pixel of difference, so wait until it reaches at
-                // least one pixel of change before setting _previousNormalizedDragPoint. Otherwise, small
-                // drags will be ignored, resulting in scrolling to not work if the drag is very slow.
-                return;
-            }
-            _previousNormalizedDragPoint = newNormalizedDragPoint;
+            var normalizedDragDelta = previousNormalizedDragPoint - newNormalizedDragPoint;
             _scrollIfNeeded(normalizedDragDelta, _pointerDownNormalizedPoint);
             // Check whether to cancel a pending viewport click so that drag-to-scroll
             // doesn't unintentionally trigger a click.
-            if (_dragToScrollClickIsPending && _dragThresholdReached) {
-                _dragToScrollClickIsPending = false;
+            if (_clickIsPending) {
+                if (_dragThresholdReached) {
+                    _clickIsPending = false;
+                }
             }
         }
 
@@ -727,48 +635,32 @@ namespace Vuplex.WebView {
 
             _pointerIsDown = true;
             _pointerDownNormalizedPoint = eventArgs.Point;
+
             if (!ClickingEnabled || WebView == null) {
                 return;
             }
-            if (DragMode == DragMode.DragToScroll) {
-                var webViewWithTouch = _getTouchIfSupported();
-                if (webViewWithTouch != null && !_options.clickWithoutStealingFocus) {
-                    webViewWithTouch.SendTouchEvent(new TouchEvent {
-                        TouchID = 1,
-                        Point = eventArgs.Point,
-                        Type = TouchEventType.Start
-                    });
-                } else {
-                    // For DragToScroll(), defer calling PointerDown() or Click() so that the click can
-                    // be cancelled if the drag exceeds the threshold needed to become a scroll.
-                    _dragToScrollClickIsPending = true;
+            if (DragMode == DragMode.DragWithinPage) {
+                var webViewWithPointerDown = WebView as IWithPointerDownAndUp;
+                if (webViewWithPointerDown != null) {
+                    webViewWithPointerDown.PointerDown(eventArgs.Point, eventArgs.ToPointerOptions());
+                    return;
+                } else if (!_loggedDragWarning) {
+                    _loggedDragWarning = true;
+                    WebViewLogger.LogWarning($"The WebViewPrefab's DragMode is set to DragWithinPage, but the webview implementation for this platform ({WebView.PluginType}) doesn't support the PointerDown and PointerUp methods needed for dragging within a page. For more info, see <em>https://developer.vuplex.com/webview/IWithPointerDownAndUp</em>.");
+                    // Fallback to setting _clickIsPending so Click() can be called.
                 }
-                return;
             }
-            // For DragMode.DragWithinPage and DragMode.Disabled, call PointerDown() immediately if the webview supports IWithPointerDownAndUp.
-            // Note that PointerDown() doesn't currently support an option to avoid stealing focus, so Click() must be used in that case.
-            var webViewWithPointerDown = WebView as IWithPointerDownAndUp;
-            if (webViewWithPointerDown != null && !_options.clickWithoutStealingFocus) {
-                webViewWithPointerDown.PointerDown(eventArgs.Point, eventArgs.ToPointerOptions());
-            } else if (DragMode == DragMode.DragWithinPage && webViewWithPointerDown == null && !_loggedDragWarning) {
-                _loggedDragWarning = true;
-                WebViewLogger.LogWarning($"The WebViewPrefab's DragMode is set to DragWithinPage, but the webview implementation for this platform ({WebView.PluginType}) doesn't support the PointerDown() and PointerUp() methods needed for dragging within a page. For more info, see <em>https://developer.vuplex.com/webview/IWithPointerDownAndUp</em>.");
-            }
+            // Defer calling PointerDown() for DragToScroll so that the click can
+            // be cancelled if drag exceeds the threshold needed to become a scroll.
+            _clickIsPending = true;
         }
 
-        void InputDetector_PointerEntered(object sender, EventArgs eventArgs) => PointerEntered?.Invoke(this, EventArgs.Empty);
-
-        void InputDetector_PointerExited(object sender, EventArgs<Vector2> eventArgs) {
+        void InputDetector_PointerExited(object sender, EventArgs eventArgs) {
 
             if (HoveringEnabled) {
                 // Remove the hover state when the pointer exits.
-                _movePointerIfNeeded(eventArgs.Value, true);
+                _movePointerIfNeeded(Vector2.zero);
             }
-            if (_hasOverriddenCursorIcon) {
-                Internal.CursorHelper.SetCursorIcon(null);
-                _hasOverriddenCursorIcon = false;
-            }
-            PointerExited?.Invoke(this, EventArgs.Empty);
         }
 
         void InputDetector_PointerMoved(object sender, EventArgs<Vector2> eventArgs) {
@@ -786,44 +678,27 @@ namespace Vuplex.WebView {
             if (!ClickingEnabled || WebView == null) {
                 return;
             }
-            var pointerUpPoint = eventArgs.Point;
-            var clickedEventArgs = new ClickedEventArgs(pointerUpPoint);
-            if (DragMode == DragMode.DragToScroll) {
-                var webViewWithTouch = _getTouchIfSupported();
-                if (webViewWithTouch != null && !_options.clickWithoutStealingFocus) {
-                    webViewWithTouch.SendTouchEvent(new TouchEvent {
-                        TouchID = 1,
-                        Point = pointerUpPoint,
-                        Type = TouchEventType.End
-                    });
-                    Clicked?.Invoke(this, clickedEventArgs);
-                    return;
-                }
-                if (!_dragToScrollClickIsPending) {
-                    // The click was cancelled because it was processed as a scroll.
-                    return;
-                }
-            }
-            _dragToScrollClickIsPending = false;
             var webViewWithPointerDownAndUp = WebView as IWithPointerDownAndUp;
-            if (webViewWithPointerDownAndUp == null || _options.clickWithoutStealingFocus) {
-                // When clickWithoutStealingFocus is enabled, use Click() because PointerDown() and PointerUp() don't support the preventStealingFocus parameter.
-                WebView.Click(eventArgs.Point, _options.clickWithoutStealingFocus);
-            } else {
-                if (DragMode == DragMode.DragToScroll) {
-                    // For DragToScroll, PointerDown() is deferred until just before PointerUp() in case the click is cancelled.
-                    webViewWithPointerDownAndUp.PointerDown(eventArgs.Point, eventArgs.ToPointerOptions());
-                } else if (DragMode == DragMode.DragWithinPage) {
-                    // For DragWithinPage, use the point passed to PointerUp() if the DragThreshold wasn't reached.
-                    var totalDragDeltaInPixels = WebView.NormalizedToPoint(_pointerDownNormalizedPoint - eventArgs.Point);
-                    var dragThresholdReached = totalDragDeltaInPixels.magnitude > DragThreshold;
-                    if (!dragThresholdReached) {
-                        pointerUpPoint = _pointerDownNormalizedPoint;
-                    }
-                }
+            if (DragMode == DragMode.DragWithinPage && webViewWithPointerDownAndUp != null) {
+                var totalDragDeltaInPixels = _convertNormalizedToPixels(_pointerDownNormalizedPoint - eventArgs.Point);
+                var dragThresholdReached = totalDragDeltaInPixels.magnitude > DragThreshold;
+                var pointerUpPoint = dragThresholdReached ? eventArgs.Point : _pointerDownNormalizedPoint;
                 webViewWithPointerDownAndUp.PointerUp(pointerUpPoint, eventArgs.ToPointerOptions());
+            } else {
+                if (!_clickIsPending) {
+                    return;
+                }
+                _clickIsPending = false;
+                // PointerDown() and PointerUp() don't support the preventStealingFocus parameter.
+                if (webViewWithPointerDownAndUp == null || _options.clickWithoutStealingFocus) {
+                    WebView.Click(eventArgs.Point, _options.clickWithoutStealingFocus);
+                } else {
+                    var pointerOptions = eventArgs.ToPointerOptions();
+                    webViewWithPointerDownAndUp.PointerDown(eventArgs.Point, pointerOptions);
+                    webViewWithPointerDownAndUp.PointerUp(eventArgs.Point, pointerOptions);
+                }
             }
-            Clicked?.Invoke(this, clickedEventArgs);
+            Clicked?.Invoke(this, new ClickedEventArgs(eventArgs.Point));
         }
 
         void InputDetector_Scrolled(object sender, ScrolledEventArgs eventArgs) {
@@ -836,7 +711,7 @@ namespace Vuplex.WebView {
             _scrollIfNeeded(normalizedScrollDelta, eventArgs.Point);
         }
 
-        void _movePointerIfNeeded(Vector2 point, bool pointerLeave = false) {
+        void _movePointerIfNeeded(Vector2 point) {
 
             var webViewWithMovablePointer = WebView as IWithMovablePointer;
             if (webViewWithMovablePointer == null) {
@@ -844,7 +719,7 @@ namespace Vuplex.WebView {
             }
             if (point != _previousMovePointerPoint) {
                 _previousMovePointerPoint = point;
-                webViewWithMovablePointer.MovePointer(point, pointerLeave);
+                webViewWithMovablePointer.MovePointer(point);
             }
         }
 
@@ -854,12 +729,6 @@ namespace Vuplex.WebView {
 
             if (WebView != null && !WebView.IsDisposed) {
                 WebView.Dispose();
-            }
-            if (KeyboardEnabled) {
-                var keyboardManager = Internal.KeyboardManager.Instance;
-                if (keyboardManager != null) {
-                    keyboardManager.SetKeyboardEnabled(this, false);
-                }
             }
             Destroy();
             // Unity doesn't automatically destroy materials and textures
@@ -871,10 +740,6 @@ namespace Vuplex.WebView {
             if (_videoMaterial != null) {
                 Destroy(_videoMaterial.mainTexture);
                 Destroy(_videoMaterial);
-            }
-            if (_hasOverriddenCursorIcon) {
-                Internal.CursorHelper.SetCursorIcon(null);
-                _hasOverriddenCursorIcon = false;
             }
         }
 
@@ -931,8 +796,11 @@ namespace Vuplex.WebView {
 
             _updateResolutionIfNeeded();
             _updatePixelDensityIfNeeded(WebView);
-            _enableOrDisableKeyboardIfNeeded();
-            _enableConsoleMessagesIfNeeded(WebView);
+            // Check if LogConsoleMessages is changed from false to true at runtime.
+            if (LogConsoleMessages && !_consoleMessageLoggedHandlerAttached && WebView != null) {
+                _consoleMessageLoggedHandlerAttached = true;
+                WebView.ConsoleMessageLogged += WebView_ConsoleMessageLogged;
+            }
         }
 
         void _updatePixelDensityIfNeeded(IWebView webView) {

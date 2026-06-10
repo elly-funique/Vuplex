@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -32,7 +32,7 @@ namespace Vuplex.WebView {
         protected override Vector2 _convertToNormalizedPoint(PointerEventData pointerEventData) {
 
             if (_canvasGetter == null) {
-                _canvasGetter = new CachingGetter<Canvas>(GetComponentInParent<Canvas>, 1, this);
+                 _canvasGetter = new CachingGetter<Canvas>(GetComponentInParent<Canvas>, 1, this);
             }
             var canvas = _canvasGetter.GetValue();
             var camera = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
@@ -50,20 +50,16 @@ namespace Vuplex.WebView {
                 }
             #endif
             RectTransformUtility.ScreenPointToLocalPointInRectangle(_getRectTransform(), mousePosition, camera, out localPoint);
-            return _convertVector2ToNormalizedPoint(localPoint);
+            return _convertToNormalizedPoint(localPoint);
         }
 
         protected override Vector2 _convertToNormalizedPoint(Vector3 worldPosition) {
 
             var localPoint = _getRectTransform().InverseTransformPoint(worldPosition);
-            var normalizedPoint = _convertVector2ToNormalizedPoint(localPoint);
-            return normalizedPoint;
+            return _convertToNormalizedPoint(localPoint);
         }
 
-        // Note: This method was originally named _convertToNormalizedPoint(Vector2), but since a Vector3 can be implicitly
-        // converted to a Vector2, it caused this method to incorrectly be called instead of _convertToNormalizedPoint(Vector3)
-        // in some cases.
-        Vector2 _convertVector2ToNormalizedPoint(Vector2 localPoint) {
+        Vector2 _convertToNormalizedPoint(Vector2 localPoint) {
 
             var normalizedPoint = Rect.PointToNormalized(_getRectTransform().rect, localPoint);
             normalizedPoint.y = 1 - normalizedPoint.y;
@@ -80,14 +76,14 @@ namespace Vuplex.WebView {
 
         protected override bool _positionIsZero(PointerEventData eventData) => eventData.position == Vector2.zero;
 
+    // Code specific to Microsoft's Mixed Reality Toolkit.
+    #if VUPLEX_MRTK
         void Start() {
-
-            #if VUPLEX_MRTK
-                // Add a NearInteractionTouchable script to allow touch interactions
-                // to trigger the IMixedRealityPointerHandler methods.
-                var touchable = gameObject.AddComponent<NearInteractionTouchableUnityUI>();
-                touchable.EventsToReceive = TouchableEventType.Pointer;
-            #endif
+            // Add a NearInteractionTouchable script to allow touch interactions
+            // to trigger the IMixedRealityPointerHandler methods.
+            var touchable = gameObject.AddComponent<NearInteractionTouchableUnityUI>();
+            touchable.EventsToReceive = TouchableEventType.Pointer;
         }
+    #endif
     }
 }

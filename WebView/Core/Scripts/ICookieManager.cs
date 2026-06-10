@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vuplex Inc. All rights reserved.
+// Copyright (c) 2022 Vuplex Inc. All rights reserved.
 //
 // Licensed under the Vuplex Commercial Software Library License, you may
 // not use this file except in compliance with the License. You may obtain
@@ -62,7 +62,7 @@ namespace Vuplex.WebView {
         /// <remarks>
         /// Important notes:
         /// <list type="bullet">
-        ///   <item>On Android, the cookies returned only have their Name and Value fields set. The other fields (e.g. Domain, Path) are set to their default values because Android doesn't provide a way to access those values.</item>
+        ///   <item>On Android, the cookies returned only have their Name and Value fields set, and the other fields are set to their default values.</item>
         ///   <item>On versions of iOS older than iOS 11, session cookies are excluded because WKHTTPCookieStore is only supported in iOS 11 and newer.</item>
         /// </list>
         /// </remarks>
